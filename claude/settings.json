@@ -27,8 +27,36 @@
     ]
   },
   "hooks": {
-    "after_edit": "if [[ \"$file_path\" == *.py ]]; then black \"$file_path\" && isort \"$file_path\"; elif [[ \"$file_path\" == *.rs ]]; then cargo fmt; elif [[ \"$file_path\" == *.ts ]] || [[ \"$file_path\" == *.tsx ]] || [[ \"$file_path\" == *.js ]] || [[ \"$file_path\" == *.jsx ]]; then prettier --write \"$file_path\"; fi",
-    "on_user_prompt_submit": "black **/*.py 2>/dev/null || true; isort **/*.py 2>/dev/null || true; cargo fmt 2>/dev/null || true; prettier --write **/*.{ts,tsx,js,jsx} 2>/dev/null || true"
+    "PostToolUse": [
+      {
+        "matcher": "Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if [[ \"$CLAUDE_FILE_PATHS\" == *.py ]]; then black \"$CLAUDE_FILE_PATHS\" && isort \"$CLAUDE_FILE_PATHS\"; elif [[ \"$CLAUDE_FILE_PATHS\" == *.rs ]]; then cargo fmt; elif [[ \"$CLAUDE_FILE_PATHS\" == *.ts ]] || [[ \"$CLAUDE_FILE_PATHS\" == *.tsx ]] || [[ \"$CLAUDE_FILE_PATHS\" == *.js ]] || [[ \"$CLAUDE_FILE_PATHS\" == *.jsx ]]; then prettier --write \"$CLAUDE_FILE_PATHS\"; fi"
+          }
+        ]
+      },
+      {
+        "matcher": "Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if [[ \"$CLAUDE_FILE_PATHS\" == *.py ]]; then black \"$CLAUDE_FILE_PATHS\" && isort \"$CLAUDE_FILE_PATHS\"; elif [[ \"$CLAUDE_FILE_PATHS\" == *.rs ]]; then cargo fmt; elif [[ \"$CLAUDE_FILE_PATHS\" == *.ts ]] || [[ \"$CLAUDE_FILE_PATHS\" == *.tsx ]] || [[ \"$CLAUDE_FILE_PATHS\" == *.js ]] || [[ \"$CLAUDE_FILE_PATHS\" == *.jsx ]]; then prettier --write \"$CLAUDE_FILE_PATHS\"; fi"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "black **/*.py 2>/dev/null || true; isort **/*.py 2>/dev/null || true; cargo fmt 2>/dev/null || true; prettier --write **/*.{ts,tsx,js,jsx} 2>/dev/null || true"
+          }
+        ]
+      }
+    ]
   },
   "system_prompt": "# Coding Style Guidelines\n\n## Core Principles\n- Follow SOLID principles strictly\n- Prioritize simplicity over complexity\n- Readability and maintainability are paramount\n- Write elegant code that follows language best practices\n- Always ask when ambiguous - keep user in the loop\n\n## Code Style\n- **Elegance**: Use language idioms and best practices (e.g., list comprehensions over for loops in Python), less is more when it doesn't sacrifice other priorities\n- **Comments**: Extra minimal - avoid comments unless absolutely necessary\n- **Docstrings**: Very minimal, only for public APIs when required\n- **Typing**: Strict typing where possible (Python type hints, TypeScript types)\n- **Error Handling**: Avoid try/except blocks unless absolutely no other option\n- **Functions**: Follow SOLID principles, prefer small functional units but prioritize simplicity\n- **Naming**: Short and context-dependent, sometimes concise but clear, always follow language conventions (snake_case Python, camelCase TS)\n- **Dependencies**: Best tool for the job, don't artificially limit useful libraries\n- **Architecture**: Mixed approach - prefer functions over classes when possible, use OOP judiciously\n- **Testing**: Pragmatic and context-dependent, gently suggest testing for complex/critical code\n\n## Decision Making\n- When multiple approaches exist, always ask user to choose\n- Present options clearly with brief explanations\n- Never assume user preference without asking"
 }
