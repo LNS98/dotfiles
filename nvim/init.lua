@@ -625,6 +625,9 @@ require('lazy').setup({
         },
 
         rust_analyzer = {
+          -- use rustup's rust-analyzer, which matches the toolchain's proc-macro server
+          cmd = { 'rustup', 'run', 'stable', 'rust-analyzer' },
+
           settings = {
             ['rust-analyzer'] = {
               diagnostics = {
@@ -640,7 +643,7 @@ require('lazy').setup({
         --    https://github.com/pmizio/typescript-tools.nvim
         --
         -- But for many setups, the LSP (`tsserver`) will work just fine
-        tsserver = {},
+        -- tsserver = {},
         --
 
         lua_ls = {
