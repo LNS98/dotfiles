@@ -112,6 +112,17 @@ for plugin in "${plugins[@]}"; do
     claude plugin install "$plugin@claude-plugins-official"
 done
 
+# --- Formatters ---
+
+echo ""
+echo "Installing formatters..."
+
+echo "  Installing black and isort..."
+pip install black isort
+
+echo "  Installing prettier..."
+npm install -g prettier
+
 # --- Claude Code settings (after plugins so installs don't override our config) ---
 
 echo ""
@@ -134,7 +145,7 @@ echo ""
 echo "  tmux:"
 echo "    - Custom bindings (prefix: C-a), vim navigation"
 echo ""
-echo "Required formatters:"
-echo "  Python: black, isort (pip install black isort)"
-echo "  Rust: cargo fmt (included with Rust)"
-echo "  TypeScript/JavaScript: prettier (npm install -g prettier)"
+echo "  Formatters:"
+echo "    - black, isort (Python)"
+echo "    - prettier (TypeScript/JavaScript)"
+echo "    - cargo fmt (install Rust separately if needed)"
