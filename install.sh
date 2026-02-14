@@ -1,72 +1,114 @@
 #!/bin/bash
-
-# Dotfiles installation script
-set -e
+set -euo pipefail
 
 DOTFILES_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-echo "🔧 Installing dotfiles from $DOTFILES_DIR..."
+echo "Installing dotfiles from $DOTFILES_DIR..."
 
-# Create Claude Code config directory if it doesn't exist
-echo "📁 Creating Claude Code config directory..."
+# --- Prerequisites ---
+
+if ! command -v claude &>/dev/null; then
+    echo "Error: claude CLI not found. Install it first: https://docs.anthropic.com/en/docs/claude-code"
+    exit 1
+fi
+
+# --- Symlink helper ---
+
+link_file() {
+    local src="$1"
+    local dst="$2"
+
+    if [ -e "$dst" ] && [ ! -L "$dst" ]; then
+        local backup="${dst}.backup.$(date +%Y%m%d_%H%M%S)"
+        echo "  Backing up $dst -> $backup"
+        mv "$dst" "$backup"
+    fi
+
+    ln -sf "$src" "$dst"
+    echo "  Linked $src -> $dst"
+}
+
+# --- Claude Code ---
+
+echo ""
+echo "Setting up Claude Code..."
 mkdir -p ~/.claude
 
-# Backup existing Claude Code settings if they exist
-if [[ -f ~/.claude/settings.json ]]; then
-    echo "💾 Backing up existing Claude Code settings..."
-    mv ~/.claude/settings.json ~/.claude/settings.json.backup.$(date +%Y%m%d_%H%M%S)
-fi
+link_file "$DOTFILES_DIR/claude/settings.json" ~/.claude/settings.json
+link_file "$DOTFILES_DIR/claude/statusline-command.sh" ~/.claude/statusline-command.sh
 
-# Symlink Claude Code settings
-echo "🔗 Linking Claude Code settings..."
-ln -sf "$DOTFILES_DIR/claude/settings.json" ~/.claude/settings.json
+# --- Neovim ---
 
-# Create Neovim config directory if it doesn't exist
-echo "📁 Creating Neovim config directory..."
+echo ""
+echo "Setting up Neovim..."
 mkdir -p ~/.config
 
-# Backup existing Neovim config if it exists
-if [[ -d ~/.config/nvim ]]; then
-    echo "💾 Backing up existing Neovim config..."
-    mv ~/.config/nvim ~/.config/nvim.backup.$(date +%Y%m%d_%H%M%S)
-fi
+link_file "$DOTFILES_DIR/nvim" ~/.config/nvim
 
-# Symlink Neovim config
-echo "🔗 Linking Neovim config..."
-ln -sf "$DOTFILES_DIR/nvim" ~/.config/nvim
+# --- tmux ---
 
-# Backup existing tmux config if it exists
-if [[ -f ~/.tmux.conf ]]; then
-    echo "💾 Backing up existing tmux config..."
-    mv ~/.tmux.conf ~/.tmux.conf.backup.$(date +%Y%m%d_%H%M%S)
-fi
-
-# Symlink tmux config
-echo "🔗 Linking tmux config..."
-ln -sf "$DOTFILES_DIR/.tmux.conf" ~/.tmux.conf
-
-echo "✅ Dotfiles installation complete!"
 echo ""
-echo "Configurations installed:"
-echo "  🤖 Claude Code:"
-echo "    • File reading/searching permissions with security protections"
-echo "    • Web search and fetch capabilities"
-echo "    • Automatic code formatting for Python, Rust, and TypeScript"
-echo "    • Custom coding style preferences (SOLID, elegant code, minimal comments, strict typing)"
-echo "    • Error handling preferences (avoid try/except unless necessary)"
+echo "Setting up tmux..."
+link_file "$DOTFILES_DIR/.tmux.conf" ~/.tmux.conf
+
+# --- Claude Code plugins: uninstall removed ---
+
 echo ""
-echo "  ⚡ Neovim:"
-echo "    • Complete Lua-based configuration"
-echo "    • Plugin management via Lazy.nvim"
-echo "    • LSP, treesitter, and modern editing features"
+echo "Removing old plugins..."
+
+removed_plugins=(
+    "superpowers@superpowers-marketplace"
+    "greptile@claude-plugins-official"
+    "ralph-loop@claude-plugins-official"
+)
+
+for plugin in "${removed_plugins[@]}"; do
+    echo "  Uninstalling $plugin..."
+    claude plugin uninstall "$plugin"
+done
+
+# --- Claude Code plugins: install ---
+
 echo ""
-echo "  🖥️  tmux:"
-echo "    • Custom key bindings (prefix: C-a)"
-echo "    • Vim-like pane navigation"
-echo "    • Smart vim/tmux pane switching"
-echo "    • Enhanced copy/paste with system integration"
+echo "Installing Claude Code plugins..."
+
+plugins=(
+    superpowers
+    rust-analyzer-lsp
+    pyright-lsp
+    code-review
+    pr-review-toolkit
+    code-simplifier
+    frontend-design
+    security-guidance
+    claude-md-management
+    firecrawl
+    context7
+    explanatory-output-style
+)
+
+for plugin in "${plugins[@]}"; do
+    echo "  Installing $plugin..."
+    claude plugin install "$plugin@claude-plugins-official"
+done
+
+# --- Summary ---
+
+echo ""
+echo "Done! Installed:"
+echo ""
+echo "  Claude Code:"
+echo "    - Settings with coding style, permissions, and formatting hooks"
+echo "    - Custom statusline (progress bar, tokens, git branch, project name)"
+echo "    - ${#plugins[@]} plugins (${#removed_plugins[@]} old plugins removed)"
+echo ""
+echo "  Neovim:"
+echo "    - Lua config with Lazy.nvim, LSP, treesitter"
+echo ""
+echo "  tmux:"
+echo "    - Custom bindings (prefix: C-a), vim navigation"
 echo ""
 echo "Required formatters:"
-echo "  • Python: black, isort (pip install black isort)"
-echo "  • Rust: cargo fmt (included with Rust)"
-echo "  • TypeScript/JavaScript: prettier (npm install -g prettier)"
+echo "  Python: black, isort (pip install black isort)"
+echo "  Rust: cargo fmt (included with Rust)"
+echo "  TypeScript/JavaScript: prettier (npm install -g prettier)"
