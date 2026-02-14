@@ -62,9 +62,14 @@ removed_plugins=(
     "ralph-loop@claude-plugins-official"
 )
 
+installed_plugins_file="$HOME/.claude/plugins/installed_plugins.json"
 for plugin in "${removed_plugins[@]}"; do
-    echo "  Uninstalling $plugin..."
-    claude plugin uninstall "$plugin"
+    if [ -f "$installed_plugins_file" ] && jq -e ".plugins[\"$plugin\"]" "$installed_plugins_file" >/dev/null 2>&1; then
+        echo "  Uninstalling $plugin..."
+        claude plugin uninstall "$plugin"
+    else
+        echo "  Skipping $plugin (not installed)"
+    fi
 done
 
 # --- Claude Code plugins: install ---
