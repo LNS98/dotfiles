@@ -12,6 +12,22 @@ if ! command -v claude &>/dev/null; then
     exit 1
 fi
 
+if ! command -v nvim &>/dev/null; then
+    echo "Error: neovim not found. Install v10+: https://github.com/neovim/neovim/releases"
+    exit 1
+fi
+
+nvim_version=$(nvim --version | head -1 | grep -oE '[0-9]+\.[0-9]+')
+if [ "$(echo "$nvim_version < 10.0" | bc)" -eq 1 ]; then
+    echo "Error: neovim v10+ required (found v$nvim_version)"
+    exit 1
+fi
+
+if ! command -v npm &>/dev/null; then
+    echo "Error: npm not found. Required for pyright LSP. Install Node.js: https://nodejs.org"
+    exit 1
+fi
+
 # --- Symlink helper ---
 
 link_file() {
