@@ -910,6 +910,14 @@ require('lazy').setup({
       --  Check out: https://github.com/echasnovski/mini.nvim
     end,
   },
+  { -- Claude Code integration
+    'coder/claudecode.nvim',
+    dependencies = { 'nvim-lua/plenary.nvim' },
+    config = function()
+      require('claudecode').setup()
+    end,
+  },
+
   { -- Highlight, edit, and navigate code
     'nvim-treesitter/nvim-treesitter',
     build = ':TSUpdate',
