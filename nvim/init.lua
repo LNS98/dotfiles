@@ -672,13 +672,21 @@ require('lazy').setup({
 
       -- You can add other tools here that you want Mason to install
       -- for you, so that they are available from within Neovim.
-      local ensure_installed = vim.tbl_keys(servers or {})
+      local ensure_installed = {}
+      for name, _ in pairs(servers or {}) do
+        if name == 'pyright' and vim.fn.executable('npm') == 0 then
+          vim.notify('pyright requires npm - skipping installation', vim.log.levels.WARN)
+        else
+          table.insert(ensure_installed, name)
+        end
+      end
       vim.list_extend(ensure_installed, {
         'stylua', -- Used to format Lua code
       })
       require('mason-tool-installer').setup { ensure_installed = ensure_installed }
 
       require('mason-lspconfig').setup {
+        automatic_enable = false,
         handlers = {
           function(server_name)
             local server = servers[server_name] or {}
