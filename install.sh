@@ -34,7 +34,6 @@ echo ""
 echo "Setting up Claude Code..."
 mkdir -p ~/.claude
 
-link_file "$DOTFILES_DIR/claude/settings.json" ~/.claude/settings.json
 link_file "$DOTFILES_DIR/claude/statusline-command.sh" ~/.claude/statusline-command.sh
 
 # --- Neovim ---
@@ -96,6 +95,12 @@ for plugin in "${plugins[@]}"; do
     echo "  Installing $plugin..."
     claude plugin install "$plugin@claude-plugins-official"
 done
+
+# --- Claude Code settings (after plugins so installs don't override our config) ---
+
+echo ""
+echo "Applying Claude Code settings..."
+link_file "$DOTFILES_DIR/claude/settings.json" ~/.claude/settings.json
 
 # --- Summary ---
 
