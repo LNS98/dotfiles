@@ -1,0 +1,98 @@
+# herdr config — parallel to ~/.tmux.conf
+# Path: ~/.config/herdr/config.toml (symlinked from dotfiles)
+# Reload after edits: `herdr server reload-config` (or prefix+shift+R below)
+# Print full default config for reference: `herdr --default-config`
+
+onboarding = false
+
+# ── Keybindings ───────────────────────────────────────────────
+# Prefix is ctrl+a (home row), like tmux. "prefix+x" = ctrl+a then x.
+[keys]
+prefix = "ctrl+a"
+
+# tabs ≈ tmux windows
+new_tab        = "prefix+c"          # tmux: c new-window
+next_tab       = "prefix+t"          # tmux: t next-window
+previous_tab   = "prefix+shift+t"    # tmux: T previous-window
+rename_tab     = "prefix+comma"      # moved off shift+t (default) to free T
+close_tab      = "prefix+shift+x"
+switch_tab     = "prefix+1..9"       # tmux base-index 1: panes/tabs are 1-based
+
+# splits — matches your vim-style bindings
+split_vertical   = "prefix+v"        # tmux: v split-window -h (left/right)
+split_horizontal = "prefix+s"        # tmux: s split-window -v (top/bottom)
+
+# pane focus (prefix + h/j/k/l, vi directions)
+focus_pane_left  = "prefix+h"
+focus_pane_down  = "prefix+j"
+focus_pane_up    = "prefix+k"
+focus_pane_right = "prefix+l"
+
+# pane swap (bonus — no tmux equivalent you had, but vi-consistent)
+swap_pane_left   = "prefix+shift+h"
+swap_pane_down   = "prefix+shift+j"
+swap_pane_up     = "prefix+shift+k"
+swap_pane_right  = "prefix+shift+l"
+
+close_pane = "prefix+x"
+zoom       = "prefix+z"
+resize_mode = "prefix+r"
+
+# navigate-mode quick keys (plain h/j/k/l while the navigate overlay is open)
+navigate_pane_left  = "h"
+navigate_pane_down  = "j"
+navigate_pane_up    = "k"
+navigate_pane_right = "l"
+
+# copy mode (tmux: [ )
+copy_mode = "prefix+["
+
+# herdr-specific but useful
+detach          = "prefix+q"         # NOTE: tmux used q for display-panes; herdr reserves q for detach
+toggle_sidebar  = "prefix+b"
+workspace_picker = "prefix+w"
+new_workspace   = "prefix+shift+n"
+
+reload_config   = "prefix+shift+r"   # tmux: R source-file (native herdr action)
+
+# send-prefix (tmux: bind C-a send-prefix) — prefix then a sends a literal
+# ctrl+a to the focused pane, so readline "beginning of line" still works.
+[[keys.command]]
+key = "prefix+a"
+type = "shell"
+command = 'herdr pane send-keys "$HERDR_ACTIVE_PANE_ID" ctrl+a'
+description = "send-prefix (literal ctrl+a)"
+
+# ── Theme (replaces tmux status-bar colors) ───────────────────
+# herdr has no status line; it themes the whole UI + sidebar dashboard.
+# tokyo-night ≈ your magenta/cyan/blue palette on a dark background.
+[theme]
+name = "tokyo-night"
+
+[theme.custom]
+accent = "#bb9af7"   # mauve/magenta — your active-window magenta
+green  = "#9ece6a"   # your green hostname
+blue   = "#7aa2f7"
+yellow = "#e0af68"   # your active pane-border yellow
+red    = "#f7768e"
+
+# ── UI / sidebar ──────────────────────────────────────────────
+[ui]
+mouse_capture = true         # tmux: set -g mouse on
+sidebar_width = 32
+confirm_close = true
+pane_borders  = true
+accent = "cyan"              # tmux: pane-border-style fg=cyan
+
+# Popup notification when an agent finishes / needs input (herdr superpower)
+[ui.toast]
+delivery = "herdr"
+delay_seconds = 1
+
+[ui.sound]
+enabled = true
+
+# ── Terminal defaults ─────────────────────────────────────────
+[terminal]
+shell_mode = "auto"          # login shell on macOS so PATH/brew init runs
+new_cwd = "follow"
