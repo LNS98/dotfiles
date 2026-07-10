@@ -28,6 +28,12 @@ if ! command -v npm &>/dev/null; then
     exit 1
 fi
 
+# Used to prune stale plugin entries below; without it the cleanup silently no-ops.
+if ! command -v jq &>/dev/null; then
+    echo "Error: jq not found. Install it: brew install jq"
+    exit 1
+fi
+
 # --- Symlink helper ---
 
 link_file() {
@@ -40,7 +46,9 @@ link_file() {
         mv "$dst" "$backup"
     fi
 
-    ln -sf "$src" "$dst"
+    # -n: don't follow $dst if it's already a symlink to a directory,
+    # otherwise the new link lands *inside* the target dir.
+    ln -sfn "$src" "$dst"
     echo "  Linked $src -> $dst"
 }
 
@@ -67,44 +75,55 @@ echo ""
 echo "Setting up tmux..."
 link_file "$DOTFILES_DIR/.tmux.conf" ~/.tmux.conf
 
-# --- Claude Code plugins: uninstall removed ---
+# --- Claude Code plugins: converge to the desired set ---
 
-echo ""
-echo "Removing old plugins..."
+# `claude plugin` writes to ~/.claude/settings.json. When that path is already
+# our symlink, those writes land in the tracked repo — uninstalling an enabled
+# plugin would delete its key there. Detach it now; it is relinked at the end.
+settings_file="$HOME/.claude/settings.json"
+settings_was_linked=false
 
-removed_plugins=(
-    "superpowers@claude-plugins-official"
-    "firecrawl@claude-plugins-official"
-    "context7@claude-plugins-official"
-    "frontend-design@claude-plugins-official"
-    "explanatory-output-style@claude-plugins-official"
-    "code-simplifier@claude-plugins-official"
-    "claude-md-management@claude-plugins-official"
-    "pr-review-toolkit@claude-plugins-official"
-    "code-review@claude-plugins-official"
+# If we die between detaching and relinking, the user is left with no settings.
+restore_settings_link() {
+    if [ "$settings_was_linked" = true ] && [ ! -L "$settings_file" ]; then
+        rm -f "$settings_file"
+        ln -sfn "$DOTFILES_DIR/claude/settings.json" "$settings_file"
+    fi
+}
+trap restore_settings_link EXIT
+
+if [ -L "$settings_file" ]; then
+    rm "$settings_file"
+    settings_was_linked=true
+fi
+
+marketplace="claude-plugins-official"
+plugins=(
+    rust-analyzer-lsp
+    pyright-lsp
+    security-guidance
 )
 
-installed_plugins_file="$HOME/.claude/plugins/installed_plugins.json"
-for plugin in "${removed_plugins[@]}"; do
-    if [ -f "$installed_plugins_file" ] && jq -e ".plugins[\"$plugin\"]" "$installed_plugins_file" >/dev/null 2>&1; then
-        echo "  Removing $plugin from installed_plugins.json..."
-        tmp=$(jq "del(.plugins[\"$plugin\"])" "$installed_plugins_file")
-        echo "$tmp" > "$installed_plugins_file"
-    else
-        echo "  Skipping $plugin (not installed)"
-    fi
+desired_ids=()
+for plugin in "${plugins[@]}"; do
+    desired_ids+=("$plugin@$marketplace")
 done
 
-# Also remove stale entries from enabledPlugins in settings.json
-settings_file="$HOME/.claude/settings.json"
-if [ -f "$settings_file" ]; then
-    for plugin in "${removed_plugins[@]}"; do
-        if jq -e ".enabledPlugins[\"$plugin\"]" "$settings_file" >/dev/null 2>&1; then
-            echo "  Removing $plugin from settings.json enabledPlugins..."
-            tmp=$(jq "del(.enabledPlugins[\"$plugin\"])" "$settings_file")
-            echo "$tmp" > "$settings_file"
+echo ""
+echo "Removing plugins outside the desired set..."
+
+installed_plugins_file="$HOME/.claude/plugins/installed_plugins.json"
+if [ -f "$installed_plugins_file" ]; then
+    while read -r installed; do
+        [ -n "$installed" ] || continue
+        if printf '%s\n' "${desired_ids[@]}" | grep -qxF "$installed"; then
+            continue
         fi
-    done
+        echo "  Uninstalling $installed..."
+        claude plugin uninstall "$installed" </dev/null
+    done < <(jq -r '.plugins | keys[]' "$installed_plugins_file")
+else
+    echo "  No plugins installed yet"
 fi
 
 # --- Claude Code plugins: install ---
@@ -112,15 +131,16 @@ fi
 echo ""
 echo "Installing Claude Code plugins..."
 
-plugins=(
-    rust-analyzer-lsp
-    pyright-lsp
-    security-guidance
-)
-
-for plugin in "${plugins[@]}"; do
+# With settings.json detached the CLI can't see enabledPlugins, so it would
+# re-register every plugin on each run. Check the install manifest instead.
+for plugin in "${desired_ids[@]}"; do
+    if [ -f "$installed_plugins_file" ] &&
+       jq -e --arg p "$plugin" '.plugins[$p]' "$installed_plugins_file" >/dev/null 2>&1; then
+        echo "  $plugin already installed"
+        continue
+    fi
     echo "  Installing $plugin..."
-    claude plugin install "$plugin@claude-plugins-official"
+    claude plugin install "$plugin" </dev/null
 done
 
 # --- Personal skills (owned, symlinked from this repo) ---
@@ -128,12 +148,20 @@ done
 echo ""
 echo "Linking personal skills..."
 mkdir -p ~/.claude/skills
+
+# Backups must live outside ~/.claude/skills, or Claude Code loads them as
+# duplicate skills (a backup dir still contains a valid SKILL.md).
+SKILL_BACKUP_DIR="$HOME/.claude/archive/skills"
+
 for skill in "$DOTFILES_DIR"/claude/skills/*/; do
     [ -d "$skill" ] || continue
     name="$(basename "$skill")"
     target="$HOME/.claude/skills/$name"
     if [ -e "$target" ] && [ ! -L "$target" ]; then
-        mv "$target" "${target}.backup.$(date +%Y%m%d_%H%M%S)"
+        mkdir -p "$SKILL_BACKUP_DIR"
+        backup="$SKILL_BACKUP_DIR/${name}.$(date +%Y%m%d_%H%M%S)"
+        echo "  Backing up existing $name -> $backup"
+        mv "$target" "$backup"
     fi
     ln -sfn "${skill%/}" "$target"
     echo "  Linked $name"
@@ -164,17 +192,44 @@ echo "  Linked promoted skills; update anytime with: git -C \"$MP_DIR\" pull"
 echo ""
 echo "Installing formatters..."
 
-echo "  Installing black and isort..."
-pip install black isort
+# Homebrew python is PEP 668 externally-managed, so `pip install` is refused.
+# Prefer brew, fall back to pipx; never touch the system interpreter.
+install_python_tool() {
+    local tool="$1"
+    if command -v "$tool" &>/dev/null; then
+        echo "  $tool already present ($(command -v "$tool"))"
+    elif command -v brew &>/dev/null; then
+        echo "  Installing $tool via brew..."
+        brew install "$tool"
+    elif command -v pipx &>/dev/null; then
+        echo "  Installing $tool via pipx..."
+        pipx install "$tool"
+    else
+        echo "Error: need brew or pipx to install $tool (pip is externally-managed)."
+        exit 1
+    fi
+}
 
-echo "  Installing prettier..."
-npm install -g prettier
+install_python_tool black
+install_python_tool isort
+
+if command -v prettier &>/dev/null; then
+    echo "  prettier already present ($(command -v prettier))"
+else
+    echo "  Installing prettier..."
+    npm install -g prettier
+fi
 
 # --- Claude Code settings (after plugins so installs don't override our config) ---
 
 echo ""
 echo "Applying Claude Code settings..."
-link_file "$DOTFILES_DIR/claude/settings.json" ~/.claude/settings.json
+# The plugin CLI may have written a fresh settings.json while ours was detached.
+# The repo file is the source of truth, so discard it rather than back it up.
+if [ "$settings_was_linked" = true ] && [ -f "$settings_file" ] && [ ! -L "$settings_file" ]; then
+    rm -f "$settings_file"
+fi
+link_file "$DOTFILES_DIR/claude/settings.json" "$settings_file"
 
 # --- Summary ---
 
@@ -184,7 +239,7 @@ echo ""
 echo "  Claude Code:"
 echo "    - Settings with coding style, permissions, and formatting hooks"
 echo "    - Custom statusline (progress bar, tokens, git branch, project name)"
-echo "    - ${#plugins[@]} plugins (${#removed_plugins[@]} old plugins removed)"
+echo "    - ${#plugins[@]} plugins (anything outside the set uninstalled)"
 echo ""
 echo "  Neovim:"
 echo "    - Lua config with Lazy.nvim, LSP, treesitter"

@@ -27,7 +27,8 @@
       "Read(target/)",
       "Read(dist/)",
       "Read(build/)"
-    ]
+    ],
+    "defaultMode": "auto"
   },
   "model": "opus[1m]",
   "hooks": {
@@ -54,7 +55,13 @@
   },
   "effortLevel": "xhigh",
   "tui": "fullscreen",
+  "voice": {
+    "enabled": true,
+    "mode": "hold"
+  },
   "skipDangerousModePermissionPrompt": true,
+  "skipAutoPermissionPrompt": true,
   "skipWorkflowUsageWarning": true,
+  "voiceEnabled": true,
   "system_prompt": "# Coding Style Guidelines\n\n## Core Principles\n- Follow SOLID principles strictly\n- Prioritize simplicity over complexity\n- Readability and maintainability are paramount\n- Write elegant code that follows language best practices\n- Always ask when ambiguous - keep user in the loop\n\n## Code Style\n- **Elegance**: Use language idioms and best practices (e.g., list comprehensions over for loops in Python), less is more when it doesn't sacrifice other priorities\n- **Comments**: Extra minimal - avoid comments unless absolutely necessary\n- **Docstrings**: Very minimal, only for public APIs when required\n- **Typing**: Strict typing where possible (Python type hints, TypeScript types)\n- **Error Handling**: Fail loudly - avoid try/except blocks unless absolutely necessary. Never silently swallow errors\n- **Functions**: Follow SOLID principles, prefer small functional units but prioritize simplicity\n- **Naming**: Short and context-dependent, sometimes concise but clear, always follow language conventions (snake_case Python, camelCase TS)\n- **Dependencies**: Best tool for the job, don't artificially limit useful libraries\n- **Architecture**: Mixed approach - prefer functions over classes when possible, use OOP judiciously\n- **Testing**: Pragmatic and context-dependent, gently suggest testing for complex/critical code\n\n## Decision Making\n- When multiple approaches exist, always ask user to choose\n- Present options clearly with brief explanations\n- Never assume user preference without asking"
 }
