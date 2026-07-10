@@ -78,6 +78,7 @@ confirm_close = true
 prompt_new_tab_name = false  # new tab (prefix+c) auto-names, no prompt
 pane_borders  = true
 accent = "cyan"              # tmux: pane-border-style fg=cyan
+agent_panel_sort = "priority"
 
 # Popup notification when an agent finishes / needs input (herdr superpower)
 [ui.toast]
