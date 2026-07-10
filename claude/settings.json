@@ -1,4 +1,7 @@
 {
+  "env": {
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
+  },
   "permissions": {
     "allow": [
       "Read",
@@ -26,6 +29,7 @@
       "Read(build/)"
     ]
   },
+  "model": "opus[1m]",
   "hooks": {
     "PostToolUse": [
       {
@@ -44,19 +48,13 @@
     "command": "~/.claude/statusline-command.sh"
   },
   "enabledPlugins": {
-    "superpowers@claude-plugins-official": true,
     "rust-analyzer-lsp@claude-plugins-official": true,
     "pyright-lsp@claude-plugins-official": true,
-    "code-review@claude-plugins-official": true,
-    "pr-review-toolkit@claude-plugins-official": true,
-    "code-simplifier@claude-plugins-official": true,
-    "frontend-design@claude-plugins-official": true,
-    "security-guidance@claude-plugins-official": true,
-    "claude-md-management@claude-plugins-official": true,
-    "firecrawl@claude-plugins-official": true,
-    "context7@claude-plugins-official": true,
-    "explanatory-output-style@claude-plugins-official": false
+    "security-guidance@claude-plugins-official": true
   },
+  "effortLevel": "xhigh",
+  "tui": "fullscreen",
   "skipDangerousModePermissionPrompt": true,
+  "skipWorkflowUsageWarning": true,
   "system_prompt": "# Coding Style Guidelines\n\n## Core Principles\n- Follow SOLID principles strictly\n- Prioritize simplicity over complexity\n- Readability and maintainability are paramount\n- Write elegant code that follows language best practices\n- Always ask when ambiguous - keep user in the loop\n\n## Code Style\n- **Elegance**: Use language idioms and best practices (e.g., list comprehensions over for loops in Python), less is more when it doesn't sacrifice other priorities\n- **Comments**: Extra minimal - avoid comments unless absolutely necessary\n- **Docstrings**: Very minimal, only for public APIs when required\n- **Typing**: Strict typing where possible (Python type hints, TypeScript types)\n- **Error Handling**: Fail loudly - avoid try/except blocks unless absolutely necessary. Never silently swallow errors\n- **Functions**: Follow SOLID principles, prefer small functional units but prioritize simplicity\n- **Naming**: Short and context-dependent, sometimes concise but clear, always follow language conventions (snake_case Python, camelCase TS)\n- **Dependencies**: Best tool for the job, don't artificially limit useful libraries\n- **Architecture**: Mixed approach - prefer functions over classes when possible, use OOP judiciously\n- **Testing**: Pragmatic and context-dependent, gently suggest testing for complex/critical code\n\n## Decision Making\n- When multiple approaches exist, always ask user to choose\n- Present options clearly with brief explanations\n- Never assume user preference without asking"
 }

@@ -18,8 +18,8 @@ if ! command -v nvim &>/dev/null; then
 fi
 
 nvim_version=$(nvim --version | head -1 | grep -oE '[0-9]+\.[0-9]+')
-if [ "$(echo "$nvim_version < 10.0" | bc)" -eq 1 ]; then
-    echo "Error: neovim v10+ required (found v$nvim_version)"
+if [ "$(echo "$nvim_version < 0.10" | bc)" -eq 1 ]; then
+    echo "Error: neovim v0.10+ required (found v$nvim_version)"
     exit 1
 fi
 
@@ -51,6 +51,7 @@ echo "Setting up Claude Code..."
 mkdir -p ~/.claude
 
 link_file "$DOTFILES_DIR/claude/statusline-command.sh" ~/.claude/statusline-command.sh
+link_file "$DOTFILES_DIR/claude/CLAUDE.md" ~/.claude/CLAUDE.md
 
 # --- Neovim ---
 
@@ -72,20 +73,39 @@ echo ""
 echo "Removing old plugins..."
 
 removed_plugins=(
-    "superpowers@superpowers-marketplace"
-    "greptile@claude-plugins-official"
-    "ralph-loop@claude-plugins-official"
+    "superpowers@claude-plugins-official"
+    "firecrawl@claude-plugins-official"
+    "context7@claude-plugins-official"
+    "frontend-design@claude-plugins-official"
+    "explanatory-output-style@claude-plugins-official"
+    "code-simplifier@claude-plugins-official"
+    "claude-md-management@claude-plugins-official"
+    "pr-review-toolkit@claude-plugins-official"
+    "code-review@claude-plugins-official"
 )
 
 installed_plugins_file="$HOME/.claude/plugins/installed_plugins.json"
 for plugin in "${removed_plugins[@]}"; do
     if [ -f "$installed_plugins_file" ] && jq -e ".plugins[\"$plugin\"]" "$installed_plugins_file" >/dev/null 2>&1; then
-        echo "  Uninstalling $plugin..."
-        claude plugin uninstall "$plugin"
+        echo "  Removing $plugin from installed_plugins.json..."
+        tmp=$(jq "del(.plugins[\"$plugin\"])" "$installed_plugins_file")
+        echo "$tmp" > "$installed_plugins_file"
     else
         echo "  Skipping $plugin (not installed)"
     fi
 done
+
+# Also remove stale entries from enabledPlugins in settings.json
+settings_file="$HOME/.claude/settings.json"
+if [ -f "$settings_file" ]; then
+    for plugin in "${removed_plugins[@]}"; do
+        if jq -e ".enabledPlugins[\"$plugin\"]" "$settings_file" >/dev/null 2>&1; then
+            echo "  Removing $plugin from settings.json enabledPlugins..."
+            tmp=$(jq "del(.enabledPlugins[\"$plugin\"])" "$settings_file")
+            echo "$tmp" > "$settings_file"
+        fi
+    done
+fi
 
 # --- Claude Code plugins: install ---
 
@@ -93,24 +113,51 @@ echo ""
 echo "Installing Claude Code plugins..."
 
 plugins=(
-    superpowers
     rust-analyzer-lsp
     pyright-lsp
-    code-review
-    pr-review-toolkit
-    code-simplifier
-    frontend-design
     security-guidance
-    claude-md-management
-    firecrawl
-    context7
-    explanatory-output-style
 )
 
 for plugin in "${plugins[@]}"; do
     echo "  Installing $plugin..."
     claude plugin install "$plugin@claude-plugins-official"
 done
+
+# --- Personal skills (owned, symlinked from this repo) ---
+
+echo ""
+echo "Linking personal skills..."
+mkdir -p ~/.claude/skills
+for skill in "$DOTFILES_DIR"/claude/skills/*/; do
+    [ -d "$skill" ] || continue
+    name="$(basename "$skill")"
+    target="$HOME/.claude/skills/$name"
+    if [ -e "$target" ] && [ ! -L "$target" ]; then
+        mv "$target" "${target}.backup.$(date +%Y%m%d_%H%M%S)"
+    fi
+    ln -sfn "${skill%/}" "$target"
+    echo "  Linked $name"
+done
+
+# --- Matt Pocock's skills (tracked upstream; git pull to update) ---
+
+echo ""
+echo "Setting up Matt Pocock's skills..."
+MP_DIR="$HOME/.claude/vendor/mattpocock-skills"
+if [ -d "$MP_DIR/.git" ]; then
+    git -C "$MP_DIR" pull --quiet && echo "  Updated existing clone"
+else
+    mkdir -p "$HOME/.claude/vendor"
+    git clone --quiet https://github.com/mattpocock/skills.git "$MP_DIR" && echo "  Cloned"
+fi
+# Link only the promoted skills (engineering + productivity), skipping his personal/in-progress ones
+for d in "$MP_DIR"/skills/engineering/*/ "$MP_DIR"/skills/productivity/*/; do
+    [ -f "$d/SKILL.md" ] || continue
+    ln -sfn "${d%/}" "$HOME/.claude/skills/$(basename "$d")"
+done
+# resolving-merge-conflicts sits in his engineering folder but isn't in his promoted set
+rm -f "$HOME/.claude/skills/resolving-merge-conflicts"
+echo "  Linked promoted skills; update anytime with: git -C \"$MP_DIR\" pull"
 
 # --- Formatters ---
 
