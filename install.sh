@@ -151,7 +151,7 @@ mkdir -p ~/.claude/skills
 
 # Backups must live outside ~/.claude/skills, or Claude Code loads them as
 # duplicate skills (a backup dir still contains a valid SKILL.md).
-SKILL_BACKUP_DIR="$HOME/.claude/skill-backups"
+SKILL_BACKUP_DIR="$HOME/.claude/archive/skills"
 
 for skill in "$DOTFILES_DIR"/claude/skills/*/; do
     [ -d "$skill" ] || continue
