@@ -28,6 +28,12 @@ if ! command -v npm &>/dev/null; then
     exit 1
 fi
 
+# Used to prune stale plugin entries below; without it the cleanup silently no-ops.
+if ! command -v jq &>/dev/null; then
+    echo "Error: jq not found. Install it: brew install jq"
+    exit 1
+fi
+
 # --- Symlink helper ---
 
 link_file() {
@@ -40,7 +46,9 @@ link_file() {
         mv "$dst" "$backup"
     fi
 
-    ln -sf "$src" "$dst"
+    # -n: don't follow $dst if it's already a symlink to a directory,
+    # otherwise the new link lands *inside* the target dir.
+    ln -sfn "$src" "$dst"
     echo "  Linked $src -> $dst"
 }
 
@@ -95,9 +103,11 @@ for plugin in "${removed_plugins[@]}"; do
     fi
 done
 
-# Also remove stale entries from enabledPlugins in settings.json
+# Also remove stale entries from enabledPlugins in a *pre-existing* settings.json.
+# Skip if it's already our symlink: writing through it would edit the tracked
+# repo file, and that file is the source of truth we're about to install anyway.
 settings_file="$HOME/.claude/settings.json"
-if [ -f "$settings_file" ]; then
+if [ -f "$settings_file" ] && [ ! -L "$settings_file" ]; then
     for plugin in "${removed_plugins[@]}"; do
         if jq -e ".enabledPlugins[\"$plugin\"]" "$settings_file" >/dev/null 2>&1; then
             echo "  Removing $plugin from settings.json enabledPlugins..."
@@ -128,12 +138,20 @@ done
 echo ""
 echo "Linking personal skills..."
 mkdir -p ~/.claude/skills
+
+# Backups must live outside ~/.claude/skills, or Claude Code loads them as
+# duplicate skills (a backup dir still contains a valid SKILL.md).
+SKILL_BACKUP_DIR="$HOME/.claude/skill-backups"
+
 for skill in "$DOTFILES_DIR"/claude/skills/*/; do
     [ -d "$skill" ] || continue
     name="$(basename "$skill")"
     target="$HOME/.claude/skills/$name"
     if [ -e "$target" ] && [ ! -L "$target" ]; then
-        mv "$target" "${target}.backup.$(date +%Y%m%d_%H%M%S)"
+        mkdir -p "$SKILL_BACKUP_DIR"
+        backup="$SKILL_BACKUP_DIR/${name}.$(date +%Y%m%d_%H%M%S)"
+        echo "  Backing up existing $name -> $backup"
+        mv "$target" "$backup"
     fi
     ln -sfn "${skill%/}" "$target"
     echo "  Linked $name"
@@ -164,11 +182,33 @@ echo "  Linked promoted skills; update anytime with: git -C \"$MP_DIR\" pull"
 echo ""
 echo "Installing formatters..."
 
-echo "  Installing black and isort..."
-pip install black isort
+# Homebrew python is PEP 668 externally-managed, so `pip install` is refused.
+# Prefer brew, fall back to pipx; never touch the system interpreter.
+install_python_tool() {
+    local tool="$1"
+    if command -v "$tool" &>/dev/null; then
+        echo "  $tool already present ($(command -v "$tool"))"
+    elif command -v brew &>/dev/null; then
+        echo "  Installing $tool via brew..."
+        brew install "$tool"
+    elif command -v pipx &>/dev/null; then
+        echo "  Installing $tool via pipx..."
+        pipx install "$tool"
+    else
+        echo "Error: need brew or pipx to install $tool (pip is externally-managed)."
+        exit 1
+    fi
+}
 
-echo "  Installing prettier..."
-npm install -g prettier
+install_python_tool black
+install_python_tool isort
+
+if command -v prettier &>/dev/null; then
+    echo "  prettier already present ($(command -v prettier))"
+else
+    echo "  Installing prettier..."
+    npm install -g prettier
+fi
 
 # --- Claude Code settings (after plugins so installs don't override our config) ---
 
