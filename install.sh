@@ -102,6 +102,7 @@ plugins=(
     rust-analyzer-lsp
     pyright-lsp
     security-guidance
+    mattpocock-skills
 )
 
 desired_ids=()
@@ -167,25 +168,8 @@ for skill in "$DOTFILES_DIR"/claude/skills/*/; do
     echo "  Linked $name"
 done
 
-# --- Matt Pocock's skills (tracked upstream; git pull to update) ---
-
-echo ""
-echo "Setting up Matt Pocock's skills..."
-MP_DIR="$HOME/.claude/vendor/mattpocock-skills"
-if [ -d "$MP_DIR/.git" ]; then
-    git -C "$MP_DIR" pull --quiet && echo "  Updated existing clone"
-else
-    mkdir -p "$HOME/.claude/vendor"
-    git clone --quiet https://github.com/mattpocock/skills.git "$MP_DIR" && echo "  Cloned"
-fi
-# Link only the promoted skills (engineering + productivity), skipping his personal/in-progress ones
-for d in "$MP_DIR"/skills/engineering/*/ "$MP_DIR"/skills/productivity/*/; do
-    [ -f "$d/SKILL.md" ] || continue
-    ln -sfn "${d%/}" "$HOME/.claude/skills/$(basename "$d")"
-done
-# resolving-merge-conflicts sits in his engineering folder but isn't in his promoted set
-rm -f "$HOME/.claude/skills/resolving-merge-conflicts"
-echo "  Linked promoted skills; update anytime with: git -C \"$MP_DIR\" pull"
+# Matt Pocock's skills ship as a native plugin since their v1.2; they are
+# installed by the plugin convergence above (mattpocock-skills in plugins=()).
 
 # --- Formatters ---
 
