@@ -51,7 +51,8 @@
   "enabledPlugins": {
     "rust-analyzer-lsp@claude-plugins-official": true,
     "pyright-lsp@claude-plugins-official": true,
-    "security-guidance@claude-plugins-official": true
+    "security-guidance@claude-plugins-official": true,
+    "mattpocock-skills@claude-plugins-official": true
   },
   "effortLevel": "xhigh",
   "tui": "fullscreen",
