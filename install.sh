@@ -171,6 +171,37 @@ done
 # Matt Pocock's skills ship as a native plugin since their v1.2; they are
 # installed by the plugin convergence above (mattpocock-skills in plugins=()).
 
+# --- Upstream skills (poteto's pstack, symlinked from a sparse clone) ---
+
+# pstack is a Cursor plugin, not a Claude Code one, so it can't go in
+# plugins=(). Its skills are plain SKILL.md dirs though, so we track the
+# upstream repo and symlink the ones we want. Re-running this script pulls.
+PSTACK_REPO="https://github.com/cursor/plugins.git"
+PSTACK_DIR="$HOME/.claude/vendor/cursor-plugins"
+pstack_skills=(
+    unslop
+    technical-writing
+)
+
+echo ""
+echo "Linking pstack skills..."
+if [ -d "$PSTACK_DIR/.git" ]; then
+    git -C "$PSTACK_DIR" pull -q --ff-only
+else
+    mkdir -p "$(dirname "$PSTACK_DIR")"
+    git clone -q --depth 1 --filter=blob:none --sparse "$PSTACK_REPO" "$PSTACK_DIR"
+    git -C "$PSTACK_DIR" sparse-checkout set pstack/skills
+fi
+for name in "${pstack_skills[@]}"; do
+    src="$PSTACK_DIR/pstack/skills/$name"
+    if [ ! -f "$src/SKILL.md" ]; then
+        echo "  Warning: $name not found upstream, skipping"
+        continue
+    fi
+    ln -sfn "$src" "$HOME/.claude/skills/$name"
+    echo "  Linked $name"
+done
+
 # --- Formatters ---
 
 echo ""
