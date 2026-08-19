@@ -30,7 +30,7 @@
     ],
     "defaultMode": "auto"
   },
-  "model": "opus[1m]",
+  "model": "claude-fable-5[1m]",
   "hooks": {
     "PostToolUse": [
       {
@@ -54,15 +54,42 @@
     "security-guidance@claude-plugins-official": true,
     "mattpocock-skills@claude-plugins-official": true
   },
-  "effortLevel": "xhigh",
+  "effortLevel": "medium",
   "tui": "fullscreen",
   "voice": {
     "enabled": true,
     "mode": "hold"
   },
   "skipDangerousModePermissionPrompt": true,
-  "skipAutoPermissionPrompt": true,
   "skipWorkflowUsageWarning": true,
+  "skipAutoPermissionPrompt": true,
   "voiceEnabled": true,
-  "system_prompt": "# Coding Style Guidelines\n\n## Core Principles\n- Follow SOLID principles strictly\n- Prioritize simplicity over complexity\n- Readability and maintainability are paramount\n- Write elegant code that follows language best practices\n- Always ask when ambiguous - keep user in the loop\n\n## Code Style\n- **Elegance**: Use language idioms and best practices (e.g., list comprehensions over for loops in Python), less is more when it doesn't sacrifice other priorities\n- **Comments**: Extra minimal - avoid comments unless absolutely necessary\n- **Docstrings**: Very minimal, only for public APIs when required\n- **Typing**: Strict typing where possible (Python type hints, TypeScript types)\n- **Error Handling**: Fail loudly - avoid try/except blocks unless absolutely necessary. Never silently swallow errors\n- **Functions**: Follow SOLID principles, prefer small functional units but prioritize simplicity\n- **Naming**: Short and context-dependent, sometimes concise but clear, always follow language conventions (snake_case Python, camelCase TS)\n- **Dependencies**: Best tool for the job, don't artificially limit useful libraries\n- **Architecture**: Mixed approach - prefer functions over classes when possible, use OOP judiciously\n- **Testing**: Pragmatic and context-dependent, gently suggest testing for complex/critical code\n\n## Decision Making\n- When multiple approaches exist, always ask user to choose\n- Present options clearly with brief explanations\n- Never assume user preference without asking"
+  "system_prompt": "# Coding Style Guidelines\n\n## Core Principles\n- Follow SOLID principles strictly\n- Prioritize simplicity over complexity\n- Readability and maintainability are paramount\n- Write elegant code that follows language best practices\n- Always ask when ambiguous - keep user in the loop\n\n## Code Style\n- **Elegance**: Use language idioms and best practices (e.g., list comprehensions over for loops in Python), less is more when it doesn't sacrifice other priorities\n- **Comments**: Extra minimal - avoid comments unless absolutely necessary\n- **Docstrings**: Very minimal, only for public APIs when required\n- **Typing**: Strict typing where possible (Python type hints, TypeScript types)\n- **Error Handling**: Fail loudly - avoid try/except blocks unless absolutely necessary. Never silently swallow errors\n- **Functions**: Follow SOLID principles, prefer small functional units but prioritize simplicity\n- **Naming**: Short and context-dependent, sometimes concise but clear, always follow language conventions (snake_case Python, camelCase TS)\n- **Dependencies**: Best tool for the job, don't artificially limit useful libraries\n- **Architecture**: Mixed approach - prefer functions over classes when possible, use OOP judiciously\n- **Testing**: Pragmatic and context-dependent, gently suggest testing for complex/critical code\n\n## Decision Making\n- When multiple approaches exist, always ask user to choose\n- Present options clearly with brief explanations\n- Never assume user preference without asking",
+  "autoMode": {
+    "environment": [
+      "### Org-wide",
+      "**Organization**: None configured",
+      "**Cloud provider(s)**: None configured",
+      "**Repository visibility**: `github.com/LNS98/finances` is PRIVATE (confirmed via gh). No public repos are in scope for this project. Repo docs describe a companion ledger repo at `~/Projects/finances-data` that is local-only (iCloud bare-repo backup, no GitHub remote) — treat it as having no remote at all.",
+      "**Internal sharing / snippet hosting**: None configured — treat public paste/gist services as outside the trust boundary",
+      "**Secrets management**: None configured",
+      "**Default / protected branches**: Default branch unknown (origin/HEAD unset); rulesets not queryable here; no classic protected branches listed. Do not assume any branch is protected — treat pushes to `LNS98/finances` as ordinary private-repo pushes, and require confirmation before force-pushing or history-rewriting on the remote.",
+      "**CI/CD deploy targets**: None configured",
+      "**Network posture**: None configured",
+      "**Source control**: The trusted repo and its remote(s) only — `/Users/yoannapeneva/Projects/finances` with `origin = https://github.com/LNS98/finances.git` (private). No additional orgs configured. `~/Projects/finances-data` (local-only ledger repo) has no remote and must never be given one; commits there are local operations only.",
+      "**Trusted internal domains**: None configured",
+      "**Trusted cloud buckets**: None configured",
+      "**Key internal services**: None configured",
+      "**Internal package registry**: None configured",
+      "**Sensitive data locations & audiences**: any file or store holding personal data, confidential business data, credentials, regulated data, or similarly sensitive material; preserve exact handles when known and share only with audiences cleared at the [named+specifics] bar. Specifically for this project: the household financial ledger and its inputs — `~/Projects/finances-data/` (Beancount ledger, `*-history.beancount`, `closes.beancount`, rules CSVs, `import.py` config), `~/Projects/finances/data/` (raw Monzo/Amex/Santander/Coinbase exports), `amex/spending.db` and any `*.db`, notebooks and chart outputs with real figures, and bank exports sitting in `~/Downloads`. This is personal financial data of a two-person household; audience is the household only. It is gitignored and must never be committed to `LNS98/finances` or any GitHub remote, and artifacts containing real figures must not be published without the user's explicit say-so.",
+      "**Data retention / declassification**: None configured",
+      "**Sensitive remote targets**: any namespace, host, or container whose name carries `prod` or `production` as a whole word or name segment (hyphen/underscore/dot-delimited — e.g. matches `prod-db`, not `producer`). Additionally for this project: `github.com/LNS98/finances` is a sensitive destination for any ledger/financial data (code only, never data), and adding any remote to `~/Projects/finances-data` is a sensitive change.",
+      "**Protected deployment namespaces / environments**: None configured — fall back to the Sensitive remote targets heuristic",
+      "**Protected IaC scopes**: IAM, RBAC, networking, quota, and node-pool resources; anything whose name or tag carries `prod` or `production` as a whole word or name segment",
+      "### User-specific",
+      "**Primary use of Claude Code**: software development for a personal household-finance workspace — Python (`uv`) Beancount importers, monthly-close and ledger-analysis workflows (`bean-query`, `bean-check`, `fava` on localhost:5001), sqlite3 inspection of local exports, read-only price lookups against `api.coinbase.com`. Personal/hobby posture, single-user.",
+      "**Trusted repo**: The git repository the agent started in — `/Users/yoannapeneva/Projects/finances` — and its configured remote `https://github.com/LNS98/finances.git` (private). Visibility scopes what is OK to commit or push there: confidential material is fine in this private repo, but secrets and sensitive data (personal & entrusted, including all household financial data described above) are never cleared into it by its visibility. Content ported, repointed, or first read from outside this session's repo is not its own work.",
+      "**Org-specific CLIs**: None configured"
+    ]
+  }
 }
