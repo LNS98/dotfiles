@@ -181,7 +181,6 @@ PSTACK_DIR="$HOME/.claude/vendor/cursor-plugins"
 pstack_skills=(
     unslop
     technical-writing
-    show-me-your-work
 )
 
 echo ""
