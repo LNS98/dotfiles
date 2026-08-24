@@ -58,6 +58,14 @@ echo ""
 echo "Setting up Claude Code..."
 mkdir -p ~/.claude
 
+# settings.json is symlinked into the live ~/.claude, where Claude Code writes
+# machine-local security context (autoMode) that must never reach the public
+# repo. The stripAutoMode filter (declared in .gitattributes) drops that key at
+# git-add time; `required` makes commits fail loudly if the filter is missing.
+git -C "$DOTFILES_DIR" config filter.stripAutoMode.clean "jq 'del(.autoMode)'"
+git -C "$DOTFILES_DIR" config filter.stripAutoMode.smudge cat
+git -C "$DOTFILES_DIR" config filter.stripAutoMode.required true
+
 link_file "$DOTFILES_DIR/claude/statusline-command.sh" ~/.claude/statusline-command.sh
 link_file "$DOTFILES_DIR/claude/CLAUDE.md" ~/.claude/CLAUDE.md
 
