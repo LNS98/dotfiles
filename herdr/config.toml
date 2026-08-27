@@ -1,7 +1,10 @@
 # herdr config — parallel to ~/.tmux.conf
 # Path: ~/.config/herdr/config.toml (symlinked from dotfiles)
 # Reload after edits: `herdr server reload-config` (or prefix+shift+R below)
+# Validate: `herdr config check`
 # Print full default config for reference: `herdr --default-config`
+# Upgrade: detach (prefix+q), then `herdr update` — it refuses to run inside a session.
+# Options below marked 0.8+ need herdr >= 0.8.2.
 
 onboarding = false
 
@@ -38,6 +41,16 @@ close_pane = "prefix+x"
 zoom       = "prefix+z"
 resize_mode = "prefix+r"
 
+# one-keystroke resize (0.8+) — tmux default is prefix+ctrl+arrows; vi letters here
+resize_pane_left  = "prefix+ctrl+h"
+resize_pane_down  = "prefix+ctrl+j"
+resize_pane_up    = "prefix+ctrl+k"
+resize_pane_right = "prefix+ctrl+l"
+
+# reorder tabs in place (0.8+) — tmux idiom: swap-window -t -1 / +1 on < and >
+move_tab_previous = "prefix+<"
+move_tab_next     = "prefix+>"
+
 # navigate-mode quick keys (plain h/j/k/l while the navigate overlay is open)
 navigate_pane_left  = "h"
 navigate_pane_down  = "j"
@@ -67,7 +80,7 @@ name = "tokyo-night"
 accent = "#bb9af7"   # mauve/magenta — your active-window magenta
 green  = "#9ece6a"   # your green hostname
 blue   = "#7aa2f7"
-yellow = "#e0af68"   # your active pane-border yellow
+yellow = "#e0af68"   # your active pane-border yellow (also the working-agent mark)
 red    = "#f7768e"
 
 # ── UI / sidebar ──────────────────────────────────────────────
@@ -79,6 +92,32 @@ prompt_new_tab_name = false  # new tab (prefix+c) auto-names, no prompt
 pane_borders  = true
 accent = "cyan"              # tmux: pane-border-style fg=cyan
 agent_panel_sort = "priority"
+
+# tmux-style splitters (0.8+): internal dividers only, no outer frame, no gaps, no scrollbars
+pane_outer_borders = false
+pane_gaps          = false
+pane_scrollbars    = false
+
+# Tab bar as tmux status bar (0.8+): bottom, with status-right clock/date + hostname
+tab_bar_position = "bottom"
+tab_bar_right = [
+  { type = "zoom" },
+  { type = "command", command = "~/.config/herdr/status.sh", interval_seconds = 5, timeout_seconds = 2 }, # cpu/mem/battery
+  { type = "datetime", format = "%a %H:%M:%S  %Y-%m-%d" },   # tmux: status-right, 24h
+]
+tab_bar_right_separator = "  "
+
+# Sidebar rows (0.8+). 0.8 dropped the blank line between entries; row_gap = 1 restores it.
+# Agents read as "tab · workspace" (what you're doing, then where) instead of the default reverse.
+[ui.sidebar.agents]
+row_gap = 1
+rows = [
+  ["state_icon", { token = "tab", fg = "#ffffff", bold = true, dim = false }, { token = "workspace", fg = "#565f89", bold = false, dim = true }],
+  ["state_text", "agent"],
+]
+
+[ui.sidebar.spaces]
+row_gap = 1
 
 # Popup notification when an agent finishes / needs input (herdr superpower)
 [ui.toast]

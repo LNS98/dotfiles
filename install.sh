@@ -41,7 +41,8 @@ link_file() {
     local dst="$2"
 
     if [ -e "$dst" ] && [ ! -L "$dst" ]; then
-        local backup="${dst}.backup.$(date +%Y%m%d_%H%M%S)"
+        local backup
+        backup="${dst}.backup.$(date +%Y%m%d_%H%M%S)"
         echo "  Backing up $dst -> $backup"
         mv "$dst" "$backup"
     fi
@@ -83,6 +84,34 @@ echo ""
 echo "Setting up tmux..."
 link_file "$DOTFILES_DIR/.tmux.conf" ~/.tmux.conf
 
+# --- herdr ---
+
+echo ""
+echo "Setting up herdr..."
+mkdir -p ~/.config/herdr
+link_file "$DOTFILES_DIR/herdr/config.toml" ~/.config/herdr/config.toml
+link_file "$DOTFILES_DIR/herdr/status.sh" ~/.config/herdr/status.sh
+
+# Optional: herdr replaces tmux for agent sessions but is not required.
+# The config uses 0.8+ keys; older herdr ignores them with warnings and lacks `config check`.
+if command -v herdr &>/dev/null; then
+    herdr_version="$(herdr --version | awk '{print $2}')"
+    if [ "$(printf '%s\n' 0.8.2 "$herdr_version" | sort -V | head -1)" != "0.8.2" ]; then
+        echo "  Warning: herdr $herdr_version is older than 0.8.2; detach and run: herdr update --handoff"
+    elif herdr config check >/dev/null 2>&1; then
+        echo "  herdr $herdr_version config ok"
+    else
+        echo "  Warning: herdr config check failed:"
+        herdr config check 2>&1 | sed 's/^/    /' || true
+    fi
+    # A running server keeps the old config until told to reload; quiet no-op if not running.
+    herdr server reload-config >/dev/null 2>&1 || true
+else
+    # The direct installer is what `herdr update --handoff` (live-preserving updates) supports;
+    # brew/mise/nix installs update through their package manager and lose running panes.
+    echo "  herdr not installed (optional): curl -fsSL https://herdr.dev/install.sh | sh"
+fi
+
 # --- Claude Code plugins: converge to the desired set ---
 
 # `claude plugin` writes to ~/.claude/settings.json. When that path is already
@@ -103,6 +132,17 @@ trap restore_settings_link EXIT
 if [ -L "$settings_file" ]; then
     rm "$settings_file"
     settings_was_linked=true
+fi
+
+# herdr's Claude integration (session ids reported to herdr, so agents resume
+# after a server restart) installs a hook script AND appends a SessionStart
+# hook with an absolute path to settings.json. Run it here, while settings.json
+# is detached, so only the script lands; the tracked settings.json already
+# carries a portable $HOME-based version of that hook.
+if command -v herdr &>/dev/null; then
+    echo ""
+    echo "Installing herdr Claude integration..."
+    herdr integration install claude </dev/null || echo "  Warning: herdr integration install failed"
 fi
 
 marketplace="claude-plugins-official"
@@ -238,6 +278,9 @@ echo "    - Lua config with Lazy.nvim, LSP, treesitter"
 echo ""
 echo "  tmux:"
 echo "    - Custom bindings (prefix: C-a), vim navigation"
+echo ""
+echo "  herdr:"
+echo "    - tmux-parity bindings (prefix: C-a), tokyo-night theme, bottom status bar"
 echo ""
 echo "  Formatters:"
 echo "    - black, isort (Python)"
