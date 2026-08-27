@@ -111,7 +111,10 @@ tab_bar_right_separator = "  "
 # Agents read as "tab · workspace" (what you're doing, then where) instead of the default reverse.
 [ui.sidebar.agents]
 row_gap = 1
-rows = [["state_icon", "tab", "workspace"], ["agent"]]
+rows = [
+  ["state_icon", { token = "tab", bold = true, dim = false }, { token = "workspace", bold = false, dim = true }],
+  ["agent"],
+]
 
 [ui.sidebar.spaces]
 row_gap = 1
