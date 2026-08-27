@@ -102,8 +102,8 @@ pane_scrollbars    = false
 tab_bar_position = "bottom"
 tab_bar_right = [
   { type = "zoom" },
-  { type = "hostname" },                                   # tmux: status-left #H
-  { type = "datetime", format = "%a %l:%M:%S %p  %Y-%m-%d" }, # tmux: status-right
+  { type = "command", command = "~/.config/herdr/status.sh", interval_seconds = 5, timeout_seconds = 2 }, # cpu/mem/battery
+  { type = "datetime", format = "%a %H:%M:%S  %Y-%m-%d" },   # tmux: status-right, 24h
 ]
 tab_bar_right_separator = "  "
 

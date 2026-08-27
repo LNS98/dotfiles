@@ -89,6 +89,7 @@ echo ""
 echo "Setting up herdr..."
 mkdir -p ~/.config/herdr
 link_file "$DOTFILES_DIR/herdr/config.toml" ~/.config/herdr/config.toml
+link_file "$DOTFILES_DIR/herdr/status.sh" ~/.config/herdr/status.sh
 
 # Optional: herdr replaces tmux for agent sessions but is not required.
 if command -v herdr &>/dev/null; then
