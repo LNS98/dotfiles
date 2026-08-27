@@ -92,7 +92,6 @@ prompt_new_tab_name = false  # new tab (prefix+c) auto-names, no prompt
 pane_borders  = true
 accent = "cyan"              # tmux: pane-border-style fg=cyan
 agent_panel_sort = "priority"
-status_indicators = "symbols"   # 0.8 removed the working spinner; distinct glyphs per state instead of colour-only dots
 
 # tmux-style splitters (0.8+): internal dividers only, no outer frame, no gaps, no scrollbars
 pane_outer_borders = false
@@ -114,7 +113,7 @@ tab_bar_right_separator = "  "
 row_gap = 1
 rows = [
   ["state_icon", { token = "tab", fg = "#ffffff", bold = true, dim = false }, { token = "workspace", fg = "#565f89", bold = false, dim = true }],
-  [{ token = "state_text", fg = "#e0af68", bold = true, dim = false }, "agent"],
+  ["state_text", "agent"],
 ]
 
 [ui.sidebar.spaces]
