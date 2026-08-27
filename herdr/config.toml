@@ -80,7 +80,7 @@ name = "tokyo-night"
 accent = "#bb9af7"   # mauve/magenta — your active-window magenta
 green  = "#9ece6a"   # your green hostname
 blue   = "#7aa2f7"
-yellow = "#e0af68"   # your active pane-border yellow
+yellow = "#ff9e64"   # hot orange: also the working-agent mark (0.8 has no spinner), was #e0af68
 red    = "#f7768e"
 
 # ── UI / sidebar ──────────────────────────────────────────────
@@ -92,6 +92,7 @@ prompt_new_tab_name = false  # new tab (prefix+c) auto-names, no prompt
 pane_borders  = true
 accent = "cyan"              # tmux: pane-border-style fg=cyan
 agent_panel_sort = "priority"
+status_indicators = "symbols"   # 0.8 removed the working spinner; distinct glyphs per state instead of colour-only dots
 
 # tmux-style splitters (0.8+): internal dividers only, no outer frame, no gaps, no scrollbars
 pane_outer_borders = false
@@ -113,7 +114,7 @@ tab_bar_right_separator = "  "
 row_gap = 1
 rows = [
   ["state_icon", { token = "tab", fg = "#ffffff", bold = true, dim = false }, { token = "workspace", fg = "#565f89", bold = false, dim = true }],
-  ["agent"],
+  [{ token = "state_text", fg = "#ff9e64", bold = true, dim = false }, "agent"],
 ]
 
 [ui.sidebar.spaces]
