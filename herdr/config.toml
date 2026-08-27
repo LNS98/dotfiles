@@ -112,7 +112,7 @@ tab_bar_right_separator = "  "
 [ui.sidebar.agents]
 row_gap = 1
 rows = [
-  ["state_icon", { token = "tab", bold = true, dim = false }, { token = "workspace", bold = false, dim = false }],
+  ["state_icon", { token = "tab", fg = "#c0caf5" }, { token = "workspace", fg = "#a9b1d6" }],
   ["agent"],
 ]
 
