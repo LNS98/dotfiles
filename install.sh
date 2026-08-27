@@ -134,6 +134,17 @@ if [ -L "$settings_file" ]; then
     settings_was_linked=true
 fi
 
+# herdr's Claude integration (session ids reported to herdr, so agents resume
+# after a server restart) installs a hook script AND appends a SessionStart
+# hook with an absolute path to settings.json. Run it here, while settings.json
+# is detached, so only the script lands; the tracked settings.json already
+# carries a portable $HOME-based version of that hook.
+if command -v herdr &>/dev/null; then
+    echo ""
+    echo "Installing herdr Claude integration..."
+    herdr integration install claude </dev/null || echo "  Warning: herdr integration install failed"
+fi
+
 marketplace="claude-plugins-official"
 plugins=(
     rust-analyzer-lsp
