@@ -1,19 +1,7 @@
 #!/bin/sh
 # Tab-bar status for herdr (ui.tab_bar_right command entry), macOS and Linux.
-# One line, e.g.: "1 blocked · 2 working  cpu 12%  mem 9.8G/16G  bat 87%"
+# One line, e.g.: "cpu 12%  mem 9.8G/16G  bat 87%"
 # Runs on the herdr server every few seconds, so keep it cheap (~30ms here).
-
-# Agents needing attention. Only non-idle states are shown, so this segment
-# disappears when nothing is happening. Needs jq (install.sh requires it).
-agents=""
-if command -v jq >/dev/null 2>&1; then
-  agents=$(herdr agent list 2>/dev/null | jq -r '
-    [.result.agents[].agent_status]
-    | { blocked: map(select(. == "blocked")) | length,
-        working: map(select(. == "working")) | length,
-        done:    map(select(. == "done"))    | length }
-    | to_entries | map(select(.value > 0) | "\(.value) \(.key)") | join(" · ")' 2>/dev/null)
-fi
 
 # CPU: sum of per-process %cpu over core count, so 100% = every core busy.
 case "$(uname -s)" in
@@ -49,6 +37,5 @@ esac
 cpu=$(ps -A -o %cpu= | awk -v n="$ncpu" '{s+=$1} END {printf "%d", s/n}')
 
 out="cpu ${cpu}%  mem ${used}G/${total}G"
-[ -n "$agents" ] && out="$agents  $out"
 [ -n "$bat" ] && out="$out  bat $bat"
 printf '%s\n' "$out"
