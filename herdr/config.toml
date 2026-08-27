@@ -1,7 +1,10 @@
 # herdr config — parallel to ~/.tmux.conf
 # Path: ~/.config/herdr/config.toml (symlinked from dotfiles)
 # Reload after edits: `herdr server reload-config` (or prefix+shift+R below)
+# Validate: `herdr config check`
 # Print full default config for reference: `herdr --default-config`
+# Upgrade: detach (prefix+q), then `herdr update` — it refuses to run inside a session.
+# Options below marked 0.8+ need herdr >= 0.8.2.
 
 onboarding = false
 
@@ -37,6 +40,16 @@ swap_pane_right  = "prefix+shift+l"
 close_pane = "prefix+x"
 zoom       = "prefix+z"
 resize_mode = "prefix+r"
+
+# one-keystroke resize (0.8+) — tmux default is prefix+ctrl+arrows; vi letters here
+resize_pane_left  = "prefix+ctrl+h"
+resize_pane_down  = "prefix+ctrl+j"
+resize_pane_up    = "prefix+ctrl+k"
+resize_pane_right = "prefix+ctrl+l"
+
+# reorder tabs in place (0.8+) — tmux idiom: swap-window -t -1 / +1 on < and >
+move_tab_previous = "prefix+<"
+move_tab_next     = "prefix+>"
 
 # navigate-mode quick keys (plain h/j/k/l while the navigate overlay is open)
 navigate_pane_left  = "h"
@@ -79,6 +92,20 @@ prompt_new_tab_name = false  # new tab (prefix+c) auto-names, no prompt
 pane_borders  = true
 accent = "cyan"              # tmux: pane-border-style fg=cyan
 agent_panel_sort = "priority"
+
+# tmux-style splitters (0.8+): internal dividers only, no outer frame, no gaps, no scrollbars
+pane_outer_borders = false
+pane_gaps          = false
+pane_scrollbars    = false
+
+# Tab bar as tmux status bar (0.8+): bottom, with status-right clock/date + hostname
+tab_bar_position = "bottom"
+tab_bar_right = [
+  { type = "zoom" },
+  { type = "hostname" },                                   # tmux: status-left #H
+  { type = "datetime", format = "%a %l:%M:%S %p  %Y-%m-%d" }, # tmux: status-right
+]
+tab_bar_right_separator = "  "
 
 # Popup notification when an agent finishes / needs input (herdr superpower)
 [ui.toast]

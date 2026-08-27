@@ -83,6 +83,27 @@ echo ""
 echo "Setting up tmux..."
 link_file "$DOTFILES_DIR/.tmux.conf" ~/.tmux.conf
 
+# --- herdr ---
+
+echo ""
+echo "Setting up herdr..."
+mkdir -p ~/.config/herdr
+link_file "$DOTFILES_DIR/herdr/config.toml" ~/.config/herdr/config.toml
+
+# Optional: herdr replaces tmux for agent sessions but is not required.
+if command -v herdr &>/dev/null; then
+    if herdr config check >/dev/null 2>&1; then
+        echo "  herdr $(herdr --version | awk '{print $2}') config ok"
+    else
+        echo "  Warning: herdr config check failed (herdr >= 0.8.2 required):"
+        herdr config check 2>&1 | sed 's/^/    /' || true
+    fi
+    # The running server keeps the old config until told to reload; fails quietly if not running.
+    herdr server reload-config >/dev/null 2>&1 || true
+else
+    echo "  herdr not installed (optional): brew install herdr"
+fi
+
 # --- Claude Code plugins: converge to the desired set ---
 
 # `claude plugin` writes to ~/.claude/settings.json. When that path is already
@@ -238,6 +259,9 @@ echo "    - Lua config with Lazy.nvim, LSP, treesitter"
 echo ""
 echo "  tmux:"
 echo "    - Custom bindings (prefix: C-a), vim navigation"
+echo ""
+echo "  herdr:"
+echo "    - tmux-parity bindings (prefix: C-a), tokyo-night theme, bottom status bar"
 echo ""
 echo "  Formatters:"
 echo "    - black, isort (Python)"
