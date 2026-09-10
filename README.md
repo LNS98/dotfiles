@@ -5,7 +5,7 @@ instructions and a pinned catalog of 32 skills. Native settings stay separate.
 
 ## Install agent configuration
 
-Requires Python 3 and Git. The first installation downloads the pinned sources
+Requires Python 3.12+ and Git. The first installation downloads the pinned sources
 from GitHub. Neither agent CLI is required to install instructions and skills.
 
 ```sh
@@ -58,11 +58,15 @@ The shared catalog contains:
 
 `agents/sources.json` records source URLs, full commit SHAs and selected paths.
 `sync-skills.py` fetches independent checkouts into ignored `agents/.vendor/`.
-It exports their content to ignored `agents/.shared/`, omitting plugin manifests
+It exports committed Git content to ignored `agents/.shared/`, omitting plugin manifests
 so both agents use the same unprefixed skill names. It does not depend on
 Claude's plugin cache or either tool's package manager.
 Upstream licenses and references stay with those complete checkouts. Existing
-pins are reused, so reruns do not silently upgrade skills.
+pins are reused, so reruns do not silently upgrade skills. Each sync rebuilds
+from the pinned commit and current overlays; deleted overlays disappear and
+modified generated files are repaired. Unchanged exports keep their existing
+directories. Treat `.shared/` as generated output and edit owned skills or
+overlays instead.
 
 `agents/overlays/` contains compatibility metadata only. The pstack overlay maps
 `technical-writing`'s existing explicit-only policy to Codex. Matt Pocock already
@@ -109,8 +113,9 @@ plugins. The full setup retains its Neovim, npm and jq prerequisites. Use
 `--agents-only` on a machine that only needs coding-agent configuration.
 
 Claude settings are symlinked as before. Claude can write machine-local
-`autoMode` data into that file. The existing required Git clean filter strips
-that field at staging time; the full installer configures it. Do not commit
+`autoMode` data into that file. A required Python Git clean filter strips
+that field at staging time. Every Claude installation path configures the filter
+before linking live settings, including agent-only and direct Python installs. Do not commit
 machine-local security context. Codex credentials, project trust and model
 choices stay outside this repo.
 

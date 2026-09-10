@@ -4,6 +4,8 @@ import contextlib
 import importlib.util
 import io
 import json
+import shutil
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -23,6 +25,15 @@ class InstallationTests(unittest.TestCase):
         self.root = self.base / "dotfiles with spaces"
         self.home = self.base / "home"
         self.root.mkdir()
+        subprocess.run(["git", "init", "--quiet", str(self.root)], check=True)
+        (self.root / ".gitattributes").write_text(
+            "claude/settings.json filter=stripAutoMode\n"
+        )
+        (self.root / "scripts").mkdir()
+        shutil.copy2(
+            Path(__file__).resolve().parents[1] / "scripts/clean-claude-settings.py",
+            self.root / "scripts/clean-claude-settings.py",
+        )
         skill = self.root / "agents/skills/example"
         skill.mkdir(parents=True)
         (skill / "SKILL.md").write_text(
@@ -77,6 +88,42 @@ class InstallationTests(unittest.TestCase):
             (self.home / ".local/share/dotfiles/backups").glob("*/example/SKILL.md")
         )
         self.assertEqual([p.read_text() for p in backups], ["user work"])
+
+    def test_fresh_claude_install_filters_machine_local_security_data(self):
+        self.install(target="claude")
+        settings = self.home / ".claude/settings.json"
+        data = json.loads(settings.read_text())
+        data["autoMode"] = {"environment": ["TEST_SENTINEL"]}
+        settings.write_text(json.dumps(data))
+        subprocess.run(
+            ["git", "-C", str(self.root), "add", "claude/settings.json"], check=True
+        )
+        staged = subprocess.check_output(
+            ["git", "-C", str(self.root), "show", ":claude/settings.json"]
+        )
+        self.assertNotIn("autoMode", json.loads(staged))
+        self.assertIn("autoMode", json.loads(settings.read_text()))
+        required = subprocess.check_output(
+            [
+                "git",
+                "-C",
+                str(self.root),
+                "config",
+                "--get",
+                "filter.stripAutoMode.required",
+            ],
+            text=True,
+        )
+        self.assertEqual(required.strip(), "true")
+        # If the filter cannot run, staging must fail rather than leaking data.
+        (self.root / "scripts/clean-claude-settings.py").unlink()
+        data["autoMode"]["environment"].append("SECOND_SENTINEL")
+        settings.write_text(json.dumps(data))
+        result = subprocess.run(
+            ["git", "-C", str(self.root), "add", "claude/settings.json"],
+            capture_output=True,
+        )
+        self.assertNotEqual(result.returncode, 0)
 
     def test_codex_only_does_not_create_claude(self):
         self.install(target="codex")

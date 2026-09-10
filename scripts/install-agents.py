@@ -4,7 +4,9 @@ import argparse
 import json
 import os
 import re
+import shlex
 import shutil
+import subprocess
 import tempfile
 from pathlib import Path
 
@@ -41,6 +43,29 @@ def catalog(root):
     return result
 
 
+def configure_claude_filter(root):
+    # Git attributes do not require an undefined filter. Set this before the
+    # live settings link can cause machine-local values to enter this repo.
+    command = "python3 " + shlex.quote(str(root / "scripts/clean-claude-settings.py"))
+    for key, value in {
+        "clean": command,
+        "smudge": "cat",
+        "required": "true",
+    }.items():
+        subprocess.run(
+            [
+                "git",
+                "-C",
+                str(root),
+                "config",
+                "--local",
+                f"filter.stripAutoMode.{key}",
+                value,
+            ],
+            check=True,
+        )
+
+
 def install(root, destination_home, target="all", dry_run=False, codex_home=None):
     skills = catalog(root)
     codex_home = codex_home or destination_home / ".codex"
@@ -63,6 +88,8 @@ def install(root, destination_home, target="all", dry_run=False, codex_home=None
             (root / "claude" / name, destination_home / ".claude" / name)
             for name in ["settings.json", "statusline-command.sh"]
         )
+    if "claude" in targets and not dry_run:
+        configure_claude_filter(root)
     # Seed native preferences only on a fresh Codex installation.
     config = codex_home / "config.toml"
     if "codex" in targets and not os.path.lexists(config):

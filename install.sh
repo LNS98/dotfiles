@@ -43,7 +43,7 @@ if ! command -v npm &>/dev/null; then
     exit 1
 fi
 
-# Used by the Claude settings clean filter and native plugin installer.
+# Used by the native Claude plugin installer.
 if ! command -v jq &>/dev/null; then
     echo "Error: jq not found. Install it: brew install jq"
     exit 1
@@ -71,11 +71,6 @@ link_file() {
 # Shared instructions and skills, independent of either agent CLI.
 python3 "$DOTFILES_DIR/scripts/sync-skills.py"
 python3 "$DOTFILES_DIR/scripts/install-agents.py"
-
-# Keep machine-local Claude security context out of git.
-git -C "$DOTFILES_DIR" config filter.stripAutoMode.clean "jq 'del(.autoMode)'"
-git -C "$DOTFILES_DIR" config filter.stripAutoMode.smudge cat
-git -C "$DOTFILES_DIR" config filter.stripAutoMode.required true
 
 # --- Neovim ---
 
