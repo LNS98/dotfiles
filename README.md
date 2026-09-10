@@ -33,7 +33,9 @@ the command itself runs under the supplied Node 22 runtime.
 Upstream owns fetching, installing, symlinking and its lockfile. Dotfiles does
 not clone upstream repositories or generate exports. Its wrapper backs up
 existing selected skill destinations before invoking the CLI, then applies the
-one compatibility metadata file in `agents/overlays/`. Upstream installation
+compatibility metadata in `agents/overlays/` and the reviewed text replacement
+in `agents/patches.json`. A patch fails if the pinned source text has changed;
+review it when advancing the upstream revision. Upstream installation
 failures stop the setup; backups remain available if a command partly installed
 its skills.
 
@@ -51,7 +53,8 @@ Claude or `$ask-matt` in Codex.
 | `agents/AGENTS.md` | `~/.claude/CLAUDE.md` | `~/.codex/AGENTS.md` |
 | `agents/skills/<name>` | Symlink in `~/.claude/skills/` | Symlink in `~/.agents/skills/` |
 | Third-party skills installed by `skills` | Symlink in `~/.claude/skills/` | Canonical directory in `~/.agents/skills/` |
-| `claude/settings.json`, status line | Symlink in `~/.claude/` | Not applicable |
+| `claude/settings.json` | Symlink on first install; existing settings preserved | Not applicable |
+| Claude status line | Symlink in `~/.claude/` | Not applicable |
 | `codex/config.toml` | Not applicable | Copied only on first install |
 
 Both tools read identical skill files and references. The legacy repo paths
@@ -61,8 +64,11 @@ files under `agents/`.
 The selected catalog contains five personal skills, the 25 promoted skills from
 Matt Pocock's v1.2.3 release, and pstack's `unslop` and `technical-writing`.
 The pstack overlay preserves `technical-writing`'s existing explicit-only policy
-in Codex. Matt Pocock already ships Codex metadata. Installation checks that the
-selected skills exist and their invocation policies agree.
+in Codex. The setup skill patch writes shared project guidance to `AGENTS.md`
+and makes it reachable from `CLAUDE.md`, preserving the user's approval gate.
+Both hosts read the same patched content. Matt Pocock already ships Codex
+metadata. Installation checks that the selected skills exist and their
+invocation policies agree.
 
 The `skills` CLI maintains its global lockfile under `~/.agents/`. To change an
 upstream version or skill selection, edit `agents/sources.json` and rerun the
@@ -70,7 +76,7 @@ installer for both tools. Remove unwanted upstream skills with
 `npx skills remove --global <name>` and remove their selection from the manifest.
 Running `skills update` separately may advance versions beyond the dotfiles pins;
 rerunning dotfiles reinstalls the selected pins. Reapply dotfiles after direct
-upstream installs or updates to restore the pstack metadata adjustment.
+upstream installs or updates to restore the compatibility adjustments.
 
 Personal skill retirement uses the dotfiles installation manifest and removes
 only unchanged links it owns. Upstream skills are managed by the upstream CLI.
@@ -83,6 +89,12 @@ Backups are under `~/.local/share/dotfiles/backups/`. Unrelated skills are kept.
 Existing Codex `config.toml` is preserved. `CODEX_HOME` is respected for Codex
 instructions and native configuration; this CLI's universal Codex skills use
 `~/.agents/skills`. An `AGENTS.override.md` takes precedence over shared guidance.
+
+Existing Claude settings retain their model, permissions, hooks and unrelated
+plugins. The installer changes only the Matt Pocock plugin's enabled flag and
+snapshots the original settings first. A link to another checkout is detached
+when that flag needs changing so the other checkout is preserved. An existing
+link to this checkout remains live. Invalid settings stop setup before mutation.
 
 Claude's Matt Pocock plugin is disabled to avoid loading the same skills twice.
 Its cache stays intact. A project-level plugin setting may enable it again and
@@ -102,6 +114,9 @@ target was selected for installation.
 Project workflows remain in their repos. Codex's starter config recognizes
 `CLAUDE.md` as a fallback when `AGENTS.md` is absent; existing Codex configs are
 not rewritten to add that option.
+Project setup uses `AGENTS.md` as the shared source and an `@AGENTS.md` import
+in a separate `CLAUDE.md`. An existing `CLAUDE.md` symlink to `AGENTS.md` also
+works. The fallback alone cannot share guidance when both files exist separately.
 
 Every Claude setup configures the required Python Git clean filter before
 linking live settings. It removes machine-local `autoMode` data at staging time
@@ -130,6 +145,10 @@ bash -n scripts/install-claude.sh
 
 Tests use temporary directories and stub the upstream CLI. They cover command
 selection, backups, failures, dry runs, personal links and the settings filter.
+They also cover active Claude preference preservation, native installer success
+and failure, and rejection of upstream patch drift. Discovery and file parity
+do not establish identical workflow behavior; use the host checks in
+[the compatibility test guide](docs/agent-compatibility.md).
 For a real CLI smoke test without replacing global skills:
 
 ```sh

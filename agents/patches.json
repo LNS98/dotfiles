@@ -1,0 +1,7 @@
+[
+  {
+    "skill": "setup-matt-pocock-skills",
+    "before": "**Pick the file to edit:**\n\n- If `CLAUDE.md` exists, edit it.\n- Else if `AGENTS.md` exists, edit it.\n- If neither exists, ask the user which one to create \u2014 don't pick for them.\n\nNever create `AGENTS.md` when `CLAUDE.md` already exists (or vice versa) \u2014 always edit the one that's already there.\n\n",
+    "after": "**Keep shared project instructions in `AGENTS.md`.**\n\n- Write the Agent skills block to `AGENTS.md`, creating the file if absent and preserving existing instructions.\n- If an older Agent skills block lives in a separate `CLAUDE.md`, include its relocation in step 3's draft. Preserve user edits, reconcile it with any existing block in `AGENTS.md`, and remove only the migrated block after approval.\n- If `CLAUDE.md` is absent, create it containing `@AGENTS.md`.\n- If `CLAUDE.md` exists separately, preserve its other instructions and ensure it imports `@AGENTS.md` once.\n- If `CLAUDE.md` already resolves to `AGENTS.md` through a symlink, edit the shared file directly and leave the link intact. Never add a self-import.\n\nInclude file creation, imports, and any block migration in step 3's draft. Write only after the user approves. Done when both hosts can reach the same Agent skills block.\n\n"
+  }
+]

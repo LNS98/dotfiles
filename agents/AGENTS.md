@@ -9,6 +9,10 @@ When a workflow says `/name`, use that named skill: Claude exposes `/name`,
 Codex exposes `$name`. Read its SKILL.md and required references. Respect its
 invocation policy and user checkpoints. Use the host's available tools for the
 same operation; do not assume Claude-specific tools or hooks exist in Codex.
+When a workflow requests subagents, use the host's delegation tools and pass
+each worker a bounded task. If delegation is unavailable, report that limitation
+and perform the work sequentially. A worker already assigned a bounded task
+performs it directly instead of delegating the same task again.
 Project AGENTS.md instructions take precedence over these personal defaults.
 
 After code edits, run the project's formatter for the files changed. Follow the

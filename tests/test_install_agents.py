@@ -4,6 +4,7 @@ import contextlib
 import importlib.util
 import io
 import json
+import os
 import shutil
 import subprocess
 import tempfile
@@ -127,6 +128,203 @@ class InstallationTests(unittest.TestCase):
             capture_output=True,
         )
         self.assertNotEqual(result.returncode, 0)
+
+    def test_existing_claude_preferences_remain_active(self):
+        settings = self.home / ".claude/settings.json"
+        settings.parent.mkdir(parents=True)
+        original = {
+            "model": "local-choice",
+            "permissions": {"deny": ["Bash(git push *)"]},
+            "hooks": {"SessionStart": []},
+            "autoMode": {"environment": ["TEST_SENTINEL"]},
+            "enabledPlugins": {"unrelated@local": True, installer.MATT_PLUGIN: True},
+        }
+        settings.write_text(json.dumps(original))
+        defaults = (self.root / "claude/settings.json").read_bytes()
+        self.install(target="claude")
+        expected = json.loads(json.dumps(original))
+        expected["enabledPlugins"][installer.MATT_PLUGIN] = False
+        self.assertEqual(json.loads(settings.read_text()), expected)
+        self.assertFalse(settings.is_symlink())
+        self.assertEqual((self.root / "claude/settings.json").read_bytes(), defaults)
+        backups = list(
+            (self.home / ".local/share/dotfiles/backups").glob(
+                "settings-*/settings.json"
+            )
+        )
+        self.assertEqual([json.loads(p.read_text()) for p in backups], [original])
+        before = settings.stat().st_mtime_ns
+        self.install(target="claude")
+        self.assertEqual(settings.stat().st_mtime_ns, before)
+
+    def test_external_settings_link_does_not_modify_other_checkout(self):
+        external = self.base / "external-settings.json"
+        original = '{"model":"local-choice"}\n'
+        external.write_text(original)
+        settings = self.home / ".claude/settings.json"
+        settings.parent.mkdir(parents=True)
+        settings.symlink_to(external)
+        self.install(target="claude")
+        self.assertEqual(external.read_text(), original)
+        self.assertFalse(settings.is_symlink())
+        self.assertEqual(json.loads(settings.read_text())["model"], "local-choice")
+
+    def test_owned_settings_link_stays_linked(self):
+        source = self.root / "claude/settings.json"
+        source.write_text('{"model":"local-choice"}\n')
+        settings = self.home / ".claude/settings.json"
+        settings.parent.mkdir(parents=True)
+        settings.symlink_to(source)
+        self.install(target="claude")
+        self.assertEqual(settings.resolve(), source.resolve())
+        self.assertEqual(json.loads(settings.read_text())["model"], "local-choice")
+        self.assertIs(
+            json.loads(settings.read_text())["enabledPlugins"][installer.MATT_PLUGIN],
+            False,
+        )
+
+    def test_existing_settings_dry_run_is_unchanged(self):
+        settings = self.home / ".claude/settings.json"
+        settings.parent.mkdir(parents=True)
+        settings.write_text('{"model":"local-choice"}\n')
+        before = settings.read_bytes()
+        self.install(target="claude", dry_run=True)
+        self.assertEqual(settings.read_bytes(), before)
+        self.assertFalse((self.home / ".local").exists())
+
+    def test_invalid_settings_fail_before_upstream_or_other_writes(self):
+        for value in ['{"model":', "[]", '{"enabledPlugins": []}']:
+            with self.subTest(value=value):
+                settings = self.home / ".claude/settings.json"
+                settings.parent.mkdir(parents=True, exist_ok=True)
+                settings.write_text(value)
+                with patch.object(installer.subprocess, "run") as run:
+                    with self.assertRaises(ValueError):
+                        self.install()
+                    run.assert_not_called()
+                self.assertEqual(settings.read_text(), value)
+                self.assertFalse((self.home / ".codex").exists())
+
+    def test_native_adapter_preserves_local_settings_and_restores_owned_link(self):
+        shutil.copy2(
+            Path(__file__).resolve().parents[1] / "scripts/install-claude.sh",
+            self.root / "scripts/install-claude.sh",
+        )
+        binaries = self.base / "bin"
+        binaries.mkdir()
+        # Fake CLIs inspect and update only the fixture's settings.
+        claude = binaries / "claude"
+        claude.write_text(
+            """#!/usr/bin/env python3
+import json, os
+from pathlib import Path
+path = Path(os.environ["CLAUDE_CONFIG_DIR"]) / "settings.json"
+data = json.loads(path.read_text())
+assert data["model"] == "local-choice"
+data.setdefault("enabledPlugins", {})["native@local"] = True
+path.write_text(json.dumps(data))
+raise SystemExit(int(os.environ.get("FAKE_CLAUDE_EXIT", "0")))
+"""
+        )
+        claude.chmod(0o755)
+        herdr = binaries / "herdr"
+        herdr.write_text("#!/bin/sh\nexit 0\n")
+        herdr.chmod(0o755)
+        settings = self.home / ".claude/settings.json"
+        settings.parent.mkdir(parents=True)
+        for linked in [False, True]:
+            for exit_code in [0, 1]:
+                with self.subTest(linked=linked, exit_code=exit_code):
+                    settings.unlink(missing_ok=True)
+                    source = self.root / "claude/settings.json"
+                    source.write_text('{"model":"local-choice"}\n')
+                    if linked:
+                        settings.symlink_to(source)
+                    else:
+                        settings.write_text(source.read_text())
+                    env = dict(
+                        os.environ,
+                        PATH=str(binaries) + os.pathsep + os.environ["PATH"],
+                        CLAUDE_CONFIG_DIR=str(settings.parent),
+                        FAKE_CLAUDE_EXIT=str(exit_code),
+                    )
+                    result = subprocess.run(
+                        ["bash", str(self.root / "scripts/install-claude.sh")],
+                        env=env,
+                        capture_output=True,
+                    )
+                    self.assertEqual(result.returncode, exit_code, result.stderr)
+                    self.assertEqual(
+                        json.loads(settings.read_text())["model"], "local-choice"
+                    )
+                    self.assertEqual(settings.is_symlink(), linked)
+                    if linked:
+                        self.assertEqual(
+                            source.read_text(), '{"model":"local-choice"}\n'
+                        )
+                    else:
+                        self.assertTrue(
+                            json.loads(settings.read_text())["enabledPlugins"][
+                                "native@local"
+                            ]
+                        )
+
+    def test_native_adapter_detaches_external_settings_link(self):
+        shutil.copy2(
+            Path(__file__).resolve().parents[1] / "scripts/install-claude.sh",
+            self.root / "scripts/install-claude.sh",
+        )
+        binaries = self.base / "bin"
+        binaries.mkdir()
+        claude = binaries / "claude"
+        claude.write_text(
+            """#!/usr/bin/env python3
+import json, os
+from pathlib import Path
+path = Path(os.environ["CLAUDE_CONFIG_DIR"]) / "settings.json"
+data = json.loads(path.read_text())
+data.setdefault("enabledPlugins", {})["native@local"] = True
+path.write_text(json.dumps(data))
+"""
+        )
+        claude.chmod(0o755)
+        external = self.base / "external-settings.json"
+        original = '{"model":"external-choice"}\n'
+        external.write_text(original)
+        settings = self.home / ".claude/settings.json"
+        settings.parent.mkdir(parents=True)
+        settings.symlink_to(external)
+        env = dict(
+            os.environ,
+            PATH=str(binaries) + os.pathsep + os.environ["PATH"],
+            CLAUDE_CONFIG_DIR=str(settings.parent),
+        )
+        subprocess.run(
+            ["bash", str(self.root / "scripts/install-claude.sh")],
+            env=env,
+            check=True,
+            capture_output=True,
+        )
+        self.assertEqual(external.read_text(), original)
+        self.assertFalse(settings.is_symlink())
+        active = json.loads(settings.read_text())
+        self.assertEqual(active["model"], "external-choice")
+        self.assertTrue(active["enabledPlugins"]["native@local"])
+
+    def test_upstream_patch_rejects_drift_before_editing_any_skill(self):
+        patches = []
+        for name, body in [("one", "old"), ("two", "changed upstream")]:
+            path = self.home / ".agents/skills" / name / "SKILL.md"
+            path.parent.mkdir(parents=True)
+            path.write_text(body)
+            patches.append({"skill": name, "before": "old", "after": "new"})
+        (self.root / "agents/patches.json").write_text(json.dumps(patches))
+        with self.assertRaisesRegex(ValueError, "no longer matches"):
+            installer.patch_upstream(self.root, self.home)
+        self.assertEqual((self.home / ".agents/skills/one/SKILL.md").read_text(), "old")
+        (self.home / ".agents/skills/two/SKILL.md").write_text("old")
+        installer.patch_upstream(self.root, self.home)
+        self.assertEqual((self.home / ".agents/skills/one/SKILL.md").read_text(), "new")
 
     def test_codex_only_does_not_create_claude(self):
         self.install(target="codex")

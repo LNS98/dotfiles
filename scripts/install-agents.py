@@ -11,6 +11,65 @@ import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+MATT_PLUGIN = "mattpocock-skills@claude-plugins-official"
+
+
+def patch_upstream(root, destination_home):
+    """Apply reviewed edits only when the pinned upstream text still matches."""
+    patches = root / "agents/patches.json"
+    if not patches.exists():
+        return
+    changes = []
+    for patch in json.loads(patches.read_text()):
+        path = destination_home / ".agents/skills" / patch["skill"] / "SKILL.md"
+        text = path.read_text()
+        if text.count(patch["before"]) != 1:
+            raise ValueError(f"{path}: compatibility patch no longer matches upstream")
+        changes.append((path, text.replace(patch["before"], patch["after"], 1)))
+    for path, text in changes:
+        path.write_text(text)
+
+
+def read_claude_settings(path):
+    data = json.loads(path.read_text())
+    if not isinstance(data, dict) or not isinstance(
+        data.get("enabledPlugins", {}), dict
+    ):
+        raise ValueError(f"{path}: settings and enabledPlugins must be JSON objects")
+    return data
+
+
+def preserve_claude_settings(root, path, archive, dry_run):
+    """Keep local preferences active; manage only the duplicate skill plugin."""
+    data = read_claude_settings(path)
+    if data.get("enabledPlugins", {}).get(MATT_PLUGIN) is False:
+        return
+    print(f"Disable duplicate skill plugin in {path}")
+    if dry_run:
+        return
+    archive.mkdir(parents=True, exist_ok=True)
+    backup = Path(tempfile.mkdtemp(prefix="settings-", dir=archive))
+    # Snapshot bytes, including when the destination is a link to another checkout.
+    shutil.copy2(path, backup / "settings.json")
+    data.setdefault("enabledPlugins", {})[MATT_PLUGIN] = False
+    # Detach external links so migration cannot modify another checkout.
+    # Existing links to this checkout stay live and use its required clean filter.
+    destination = path
+    if (
+        path.is_symlink()
+        and path.resolve() == (root / "claude/settings.json").resolve()
+    ):
+        destination = path.resolve()
+    with tempfile.NamedTemporaryFile(
+        mode="w", dir=destination.parent, delete=False
+    ) as f:
+        temporary = Path(f.name)
+        try:
+            f.write(json.dumps(data, indent=2) + "\n")
+            f.close()
+            temporary.replace(destination)
+        finally:
+            temporary.unlink(missing_ok=True)
 
 
 def catalog(root, installed_home=None):
@@ -113,6 +172,7 @@ def install_upstream(root, destination_home, targets, dry_run):
             env["XDG_STATE_HOME"] = str(destination_home / ".skills-state")
         subprocess.run(command, cwd=destination_home, env=env, check=True)
     if not dry_run:
+        patch_upstream(root, destination_home)
         for name in names:
             overlay = root / "agents/overlays" / name
             if overlay.exists():
@@ -161,6 +221,9 @@ def install(root, destination_home, target="all", dry_run=False, codex_home=None
             raise ValueError(
                 "This dotfiles setup uses ~/.claude; unset CLAUDE_CONFIG_DIR or set it to ~/.claude before installing Claude"
             )
+    settings = destination_home / ".claude/settings.json"
+    if "claude" in targets and os.path.lexists(settings):
+        read_claude_settings(settings)
     install_upstream(root, destination_home, targets, dry_run)
     upstream = set(upstream_names(root))
     links = []
@@ -178,10 +241,14 @@ def install(root, destination_home, target="all", dry_run=False, codex_home=None
     if "claude" in targets:
         links.extend(
             (root / "claude" / name, destination_home / ".claude" / name)
-            for name in ["settings.json", "statusline-command.sh"]
+            for name in ["statusline-command.sh"]
         )
+        if not os.path.lexists(settings):
+            links.append((root / "claude/settings.json", settings))
     if "claude" in targets and not dry_run:
         configure_claude_filter(root)
+    if "claude" in targets and os.path.lexists(settings):
+        preserve_claude_settings(root, settings, archive, dry_run)
     # Seed native preferences only on a fresh Codex installation.
     config = codex_home / "config.toml"
     if "codex" in targets and not os.path.lexists(config):

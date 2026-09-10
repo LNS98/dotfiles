@@ -6,10 +6,10 @@ if ! command -v claude >/dev/null 2>&1; then
     echo "Claude CLI absent; skipping native Claude plugins. Shared skills are installed."
     exit 0
 fi
-# `claude plugin` writes to ~/.claude/settings.json. When that path is already
-# our symlink, those writes land in the tracked repo — uninstalling an enabled
-# plugin would delete its key there. Detach it now; it is relinked at the end.
-settings_file="$HOME/.claude/settings.json"
+# Preserve local settings. Only detach this checkout's live settings link;
+# native CLI writes must not change the tracked defaults.
+claude_dir="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
+settings_file="$claude_dir/settings.json"
 settings_was_linked=false
 
 # If we die between detaching and relinking, the user is left with no settings.
@@ -22,8 +22,13 @@ restore_settings_link() {
 trap restore_settings_link EXIT
 
 if [ -L "$settings_file" ]; then
+    settings_copy="$(mktemp "$claude_dir/settings.XXXXXX")"
+    cp "$settings_file" "$settings_copy"
+    if [ "$settings_file" -ef "$DOTFILES_DIR/claude/settings.json" ]; then
+        settings_was_linked=true
+    fi
     rm "$settings_file"
-    settings_was_linked=true
+    mv "$settings_copy" "$settings_file"
 fi
 
 # herdr's Claude integration (session ids reported to herdr, so agents resume
@@ -49,15 +54,14 @@ for plugin in "${plugins[@]}"; do
     desired_ids+=("$plugin@$marketplace")
 done
 
-installed_plugins_file="$HOME/.claude/plugins/installed_plugins.json"
+installed_plugins_file="$claude_dir/plugins/installed_plugins.json"
 
 # --- Claude Code plugins: install ---
 
 echo ""
 echo "Installing Claude Code plugins..."
 
-# With settings.json detached the CLI can't see enabledPlugins, so it would
-# re-register every plugin on each run. Check the install manifest instead.
+# Check the install manifest before asking the CLI to install a plugin again.
 for plugin in "${desired_ids[@]}"; do
     if [ -f "$installed_plugins_file" ] &&
        jq -e --arg p "$plugin" '.plugins[$p]' "$installed_plugins_file" >/dev/null 2>&1; then
@@ -68,16 +72,5 @@ for plugin in "${desired_ids[@]}"; do
     claude plugin install "$plugin" </dev/null
 done
 
-# --- Claude Code settings (after plugins so installs don't override our config) ---
-
-echo ""
-echo "Applying Claude Code settings..."
-# The plugin CLI may have written a fresh settings.json while ours was detached.
-# The repo file is the source of truth, so discard it rather than back it up.
-if [ "$settings_was_linked" = true ] && [ -f "$settings_file" ] && [ ! -L "$settings_file" ]; then
-    rm -f "$settings_file"
-fi
-if [ -e "$settings_file" ] && [ ! -L "$settings_file" ]; then
-    mv "$settings_file" "${settings_file}.backup.$(date +%Y%m%d_%H%M%S)"
-fi
-ln -sfn "$DOTFILES_DIR/claude/settings.json" "$settings_file"
+# The EXIT trap restores only this checkout's original link. Local settings
+# retain both their existing preferences and the native CLI's plugin additions.
