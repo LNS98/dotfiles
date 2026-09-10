@@ -21,7 +21,6 @@ if [ "${1:-}" = "--agents-only" ]; then
         exec python3 "$DOTFILES_DIR/scripts/install-agents.py" --target "$target" --dry-run
     fi
     [ "$#" -eq 0 ] || { echo "Unexpected arguments" >&2; exit 2; }
-    python3 "$DOTFILES_DIR/scripts/sync-skills.py"
     exec python3 "$DOTFILES_DIR/scripts/install-agents.py" --target "$target"
 fi
 [ "$#" -eq 0 ] || { echo "Use --help for usage" >&2; exit 2; }
@@ -69,7 +68,6 @@ link_file() {
 }
 
 # Shared instructions and skills, independent of either agent CLI.
-python3 "$DOTFILES_DIR/scripts/sync-skills.py"
 python3 "$DOTFILES_DIR/scripts/install-agents.py"
 
 # --- Neovim ---

@@ -9,6 +9,7 @@ import subprocess
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 SPEC = importlib.util.spec_from_file_location(
     "installer", Path(__file__).resolve().parents[1] / "scripts/install-agents.py"
@@ -39,7 +40,9 @@ class InstallationTests(unittest.TestCase):
         (skill / "SKILL.md").write_text(
             "---\nname: example\ndescription: Example\n---\nBody\n"
         )
-        (self.root / "agents/sources.json").write_text("{}\n")
+        (self.root / "agents/sources.json").write_text(
+            '{"cli_version":"1.5.25","sources":[]}\n'
+        )
         (self.root / "agents/AGENTS.md").write_text("Shared instructions\n")
         (self.root / "claude").mkdir()
         (self.root / "claude/settings.json").write_text(
@@ -161,12 +164,106 @@ class InstallationTests(unittest.TestCase):
         metadata.write_text("policy:\n  allow_implicit_invocation: false\n")
         self.install()
 
-    def test_missing_source_fails_before_writing(self):
+    def add_upstream_fixture(self):
         (self.root / "agents/sources.json").write_text(
-            json.dumps({"upstream": {"commit": "a" * 40, "skills": ["missing"]}})
+            json.dumps(
+                {
+                    "cli_version": "1.5.25",
+                    "sources": [
+                        {
+                            "source": "https://github.com/example/skills.git#"
+                            + "a" * 40,
+                            "skills": ["upstream"],
+                        }
+                    ],
+                }
+            )
         )
-        with self.assertRaises(FileNotFoundError):
+
+    def test_invalid_selection_fails_before_writing(self):
+        self.add_upstream_fixture()
+        path = self.root / "agents/sources.json"
+        path.write_text(path.read_text().replace('"upstream"', '"../escape"'))
+        with self.assertRaises(ValueError):
             self.install()
+        self.assertFalse(self.home.exists())
+
+    def test_upstream_cli_owns_download_installation_and_links(self):
+        self.add_upstream_fixture()
+
+        def run(command, **kwargs):
+            self.assertEqual(command[:3], ["npx", "--yes", "--package=node@22"])
+            self.assertIn("--package=skills@1.5.25", command)
+            self.assertIn("codex", command)
+            self.assertNotIn("claude-code", command)
+            canonical = self.home / ".agents/skills/upstream"
+            canonical.mkdir(parents=True)
+            (canonical / "SKILL.md").write_text(
+                "---\nname: upstream\ndescription: Test\n---\n"
+            )
+
+        with patch.object(installer.subprocess, "run", side_effect=run) as mocked:
+            self.install(target="codex")
+        self.assertEqual(mocked.call_count, 1)
+        self.assertFalse((self.home / ".claude").exists())
+
+    def test_upstream_failure_preserves_existing_installation_and_configuration(self):
+        self.add_upstream_fixture()
+        old = self.home / ".agents/skills/upstream"
+        old.mkdir(parents=True)
+        (old / "SKILL.md").write_text("old skill")
+        with patch.object(
+            installer.subprocess,
+            "run",
+            side_effect=subprocess.CalledProcessError(1, "npx"),
+        ):
+            with self.assertRaises(subprocess.CalledProcessError):
+                self.install()
+        self.assertEqual((old / "SKILL.md").read_text(), "old skill")
+        self.assertFalse((self.home / ".claude/settings.json").exists())
+        backups = list(
+            (self.home / ".local/share/dotfiles/backups").glob(
+                "upstream-*/.agents/skills/upstream/SKILL.md"
+            )
+        )
+        self.assertEqual([path.read_text() for path in backups], ["old skill"])
+
+    def test_custom_claude_directory_is_rejected_before_any_writes(self):
+        self.add_upstream_fixture()
+        with patch.object(Path, "home", return_value=self.home), patch.dict(
+            installer.os.environ,
+            {"CLAUDE_CONFIG_DIR": str(self.base / "custom-claude")},
+        ):
+            with patch.object(installer.subprocess, "run") as mocked:
+                with self.assertRaisesRegex(ValueError, "CLAUDE_CONFIG_DIR"):
+                    self.install()
+            mocked.assert_not_called()
+        self.assertFalse(self.home.exists())
+
+    def test_global_cli_receives_absolute_default_claude_directory(self):
+        self.add_upstream_fixture()
+
+        def run(command, **kwargs):
+            self.assertIn("--global", command)
+            self.assertEqual(
+                kwargs["env"]["CLAUDE_CONFIG_DIR"], str(self.home / ".claude")
+            )
+            canonical = self.home / ".agents/skills/upstream"
+            canonical.mkdir(parents=True)
+            (canonical / "SKILL.md").write_text(
+                "---\nname: upstream\ndescription: Test\n---\n"
+            )
+
+        with patch.object(Path, "home", return_value=self.home), patch.dict(
+            installer.os.environ, {"CLAUDE_CONFIG_DIR": "~/.claude"}
+        ), patch.object(installer.subprocess, "run", side_effect=run):
+            installer.install_upstream(self.root, self.home, ["claude"], False)
+
+    def test_upstream_dry_run_does_not_launch_cli(self):
+        self.add_upstream_fixture()
+        with patch.object(installer.subprocess, "run") as mocked:
+            self.install(dry_run=True)
+        mocked.assert_not_called()
         self.assertFalse(self.home.exists())
 
     def test_removed_owned_skills_are_retired_but_user_replacements_survive(self):

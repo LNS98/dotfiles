@@ -13,14 +13,13 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def catalog(root):
+def catalog(root, installed_home=None):
     result = {}
     paths = list(sorted((root / "agents/skills").iterdir()))
-    for source_name, source in json.loads(
-        (root / "agents/sources.json").read_text()
-    ).items():
-        base = root / "agents/.shared" / source_name / source["commit"]
-        paths.extend(base / path for path in source["skills"])
+    if installed_home is not None:
+        paths.extend(
+            installed_home / ".agents/skills" / name for name in upstream_names(root)
+        )
     for path in paths:
         text = (path / "SKILL.md").read_text()
         frontmatter = text.split("---", 2)[1]
@@ -41,6 +40,88 @@ def catalog(root):
             raise ValueError(f"{path}: Claude and Codex invocation policies differ")
         result[path.name] = path
     return result
+
+
+def upstream_names(root):
+    manifest = json.loads((root / "agents/sources.json").read_text())
+    names = [name for source in manifest["sources"] for name in source["skills"]]
+    if len(names) != len(set(names)) or any(
+        not re.fullmatch(r"[a-z0-9-]+", name) for name in names
+    ):
+        raise ValueError("Upstream skill names must be unique lowercase names")
+    return names
+
+
+def install_upstream(root, destination_home, targets, dry_run):
+    manifest = json.loads((root / "agents/sources.json").read_text())
+    names = upstream_names(root)
+    if set(names) & set(catalog(root)):
+        raise ValueError("Personal and upstream skill names must be distinct")
+    cli = [
+        "npx",
+        "--yes",
+        "--package=node@22",
+        f"--package=skills@{manifest['cli_version']}",
+        "--",
+        "skills",
+    ]
+    agents = ["claude-code" if target == "claude" else target for target in targets]
+    for source in manifest["sources"]:
+        command = cli + [
+            "add",
+            source["source"],
+            "--agent",
+            *agents,
+            "--skill",
+            *source["skills"],
+            "--yes",
+        ]
+        # Project scope gives isolated --home tests the same .agents/.claude layout.
+        # Real installs use the upstream CLI's global scope and lockfile.
+        if destination_home == Path.home():
+            command.append("--global")
+        print(shlex.join(command))
+        if dry_run:
+            continue
+        destination_home.mkdir(parents=True, exist_ok=True)
+        existing = [
+            destination_home / ".agents/skills" / name for name in source["skills"]
+        ]
+        if "claude" in targets:
+            existing.extend(
+                destination_home / ".claude/skills" / name for name in source["skills"]
+            )
+        existing = [path for path in existing if os.path.lexists(path)]
+        if existing:
+            archives = destination_home / ".local/share/dotfiles/backups"
+            archives.mkdir(parents=True, exist_ok=True)
+            backup = Path(tempfile.mkdtemp(prefix="upstream-", dir=archives))
+            for path in existing:
+                saved = backup / path.relative_to(destination_home)
+                saved.parent.mkdir(parents=True, exist_ok=True)
+                if path.is_symlink():
+                    saved.symlink_to(path.resolve())
+                elif path.is_dir():
+                    shutil.copytree(path, saved, symlinks=True)
+                else:
+                    shutil.copy2(path, saved)
+            print(f"Previous skill installation saved in {backup}")
+        env = os.environ.copy()
+        if destination_home == Path.home() and "claude" in targets:
+            env["CLAUDE_CONFIG_DIR"] = str(destination_home / ".claude")
+        if destination_home != Path.home():
+            env["XDG_STATE_HOME"] = str(destination_home / ".skills-state")
+        subprocess.run(command, cwd=destination_home, env=env, check=True)
+    if not dry_run:
+        for name in names:
+            overlay = root / "agents/overlays" / name
+            if overlay.exists():
+                shutil.copytree(
+                    overlay,
+                    destination_home / ".agents/skills" / name,
+                    dirs_exist_ok=True,
+                )
+        catalog(root, destination_home)
 
 
 def configure_claude_filter(root):
@@ -71,6 +152,17 @@ def install(root, destination_home, target="all", dry_run=False, codex_home=None
     codex_home = codex_home or destination_home / ".codex"
     archive = destination_home / ".local/share/dotfiles/backups"
     targets = ["claude", "codex"] if target == "all" else [target]
+    configured_claude = os.environ.get("CLAUDE_CONFIG_DIR", "").strip()
+    if "claude" in targets and destination_home == Path.home() and configured_claude:
+        if (
+            Path(configured_claude).expanduser().resolve()
+            != (destination_home / ".claude").resolve()
+        ):
+            raise ValueError(
+                "This dotfiles setup uses ~/.claude; unset CLAUDE_CONFIG_DIR or set it to ~/.claude before installing Claude"
+            )
+    install_upstream(root, destination_home, targets, dry_run)
+    upstream = set(upstream_names(root))
     links = []
     for agent in targets:
         skill_dir = destination_home / (
@@ -131,6 +223,7 @@ def install(root, destination_home, target="all", dry_run=False, codex_home=None
             old_link = skill_dir / name
             if (
                 name not in skills
+                and name not in upstream
                 and old_link.is_symlink()
                 and os.readlink(old_link) == old_source
             ):
@@ -146,7 +239,7 @@ def install(root, destination_home, target="all", dry_run=False, codex_home=None
         if Path(os.readlink(old)) == root / "claude/skills/show-me-your-work":
             backup(old)
     print(
-        f'{"Would install" if dry_run else "Installed"} {len(skills)} shared skills for {", ".join(targets)}'
+        f'{"Would install" if dry_run else "Installed"} {len(skills) + len(upstream)} shared skills for {", ".join(targets)}'
     )
     return skills
 
@@ -180,8 +273,8 @@ if __name__ == "__main__":
             args.dry_run,
             selected_codex_home,
         )
-    except (OSError, ValueError) as error:
+    except (OSError, ValueError, subprocess.CalledProcessError) as error:
         parser.exit(
             1,
-            f"{error}\nRun python3 scripts/sync-skills.py to fetch missing pinned sources.\n",
+            f"{error}\n",
         )
