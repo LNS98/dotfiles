@@ -34,7 +34,7 @@ Summarise what's present and what's missing. Walk the decisions **one at a time*
 
 ## 3. Write
 
-Write `docs/agents/experiments.md` with the confirmed answers (create `docs/agents/` if absent). Add an `## Experiments` block to the repo's `CLAUDE.md` (or `AGENTS.md` if that's what exists) pointing at it:
+Write `docs/agents/experiments.md` with the confirmed answers (create `docs/agents/` if absent). Add an `## Experiments` block to the repo's `AGENTS.md` (create it if absent, and link to it from `CLAUDE.md` when present) pointing at it:
 
 ```markdown
 ## Experiments

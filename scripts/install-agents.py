@@ -1,0 +1,160 @@
+#!/usr/bin/env python3
+"""Link a single skill catalog and instruction file into each selected agent."""
+import argparse
+import json
+import os
+import re
+import shutil
+import tempfile
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+def catalog(root):
+    result = {}
+    paths = list(sorted((root / "agents/skills").iterdir()))
+    for source_name, source in json.loads(
+        (root / "agents/sources.json").read_text()
+    ).items():
+        base = root / "agents/.shared" / source_name / source["commit"]
+        paths.extend(base / path for path in source["skills"])
+    for path in paths:
+        text = (path / "SKILL.md").read_text()
+        frontmatter = text.split("---", 2)[1]
+        match = re.search(r"^name:\s*([a-z0-9-]+)\s*$", frontmatter, re.M)
+        if not match or match[1] != path.name:
+            raise ValueError(f"{path}: name must match the skill directory")
+        if path.name in result:
+            raise ValueError(f"Duplicate skill: {path.name}")
+        # Check invocation parity before touching the installation.
+        explicit = bool(
+            re.search(r"^disable-model-invocation:\s*true\s*$", frontmatter, re.M)
+        )
+        metadata = path / "agents/openai.yaml"
+        codex_explicit = metadata.exists() and bool(
+            re.search(r"allow_implicit_invocation:\s*false", metadata.read_text())
+        )
+        if explicit != codex_explicit:
+            raise ValueError(f"{path}: Claude and Codex invocation policies differ")
+        result[path.name] = path
+    return result
+
+
+def install(root, destination_home, target="all", dry_run=False, codex_home=None):
+    skills = catalog(root)
+    codex_home = codex_home or destination_home / ".codex"
+    archive = destination_home / ".local/share/dotfiles/backups"
+    targets = ["claude", "codex"] if target == "all" else [target]
+    links = []
+    for agent in targets:
+        skill_dir = destination_home / (
+            ".claude/skills" if agent == "claude" else ".agents/skills"
+        )
+        links.extend((source, skill_dir / name) for name, source in skills.items())
+        instructions = (
+            destination_home / ".claude/CLAUDE.md"
+            if agent == "claude"
+            else codex_home / "AGENTS.md"
+        )
+        links.append((root / "agents/AGENTS.md", instructions))
+    if "claude" in targets:
+        links.extend(
+            (root / "claude" / name, destination_home / ".claude" / name)
+            for name in ["settings.json", "statusline-command.sh"]
+        )
+    # Seed native preferences only on a fresh Codex installation.
+    config = codex_home / "config.toml"
+    if "codex" in targets and not os.path.lexists(config):
+        print(f"Seed {config}")
+        if not dry_run:
+            config.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(root / "codex/config.toml", config)
+    if "codex" in targets and (codex_home / "AGENTS.override.md").exists():
+        print(
+            f'Note: {codex_home / "AGENTS.override.md"} takes precedence over shared instructions'
+        )
+
+    def backup(path):
+        print(f"Archive {path}")
+        if not dry_run:
+            archive.mkdir(parents=True, exist_ok=True)
+            folder = Path(tempfile.mkdtemp(prefix="migration-", dir=archive))
+            path.rename(folder / path.name)
+
+    for source, destination in links:
+        if destination.is_symlink() and destination.resolve() == source.resolve():
+            continue
+        print(f"Link {destination} -> {source}")
+        if os.path.lexists(destination):
+            backup(destination)
+        if not dry_run:
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            destination.symlink_to(source, target_is_directory=source.is_dir())
+
+    # Only retire links that our prior manifest owns, and only if still unchanged.
+    state_dir = destination_home / ".local/share/dotfiles"
+    for agent in targets:
+        state_file = state_dir / f"{agent}-skills.json"
+        previous = json.loads(state_file.read_text()) if state_file.exists() else {}
+        skill_dir = destination_home / (
+            ".claude/skills" if agent == "claude" else ".agents/skills"
+        )
+        for name, old_source in previous.items():
+            old_link = skill_dir / name
+            if (
+                name not in skills
+                and old_link.is_symlink()
+                and os.readlink(old_link) == old_source
+            ):
+                backup(old_link)
+        current = {name: str(source) for name, source in skills.items()}
+        if not dry_run and previous != current:
+            state_dir.mkdir(parents=True, exist_ok=True)
+            state_file.write_text(json.dumps(current, indent=2) + "\n")
+
+    # Remove only a known obsolete, broken dotfiles link. Leave unrelated skills alone.
+    old = destination_home / ".claude/skills/show-me-your-work"
+    if "claude" in targets and old.is_symlink() and not old.exists():
+        if Path(os.readlink(old)) == root / "claude/skills/show-me-your-work":
+            backup(old)
+    print(
+        f'{"Would install" if dry_run else "Installed"} {len(skills)} shared skills for {", ".join(targets)}'
+    )
+    return skills
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--target", choices=["all", "claude", "codex"], default="all")
+    parser.add_argument(
+        "--home",
+        type=Path,
+        default=Path.home(),
+        help="Destination home, also useful for isolated tests",
+    )
+    parser.add_argument(
+        "--codex-home", type=Path, help="Defaults to CODEX_HOME, or <home>/.codex"
+    )
+    parser.add_argument("--dry-run", action="store_true")
+    args = parser.parse_args()
+    selected_codex_home = args.codex_home
+    if (
+        selected_codex_home is None
+        and args.home == Path.home()
+        and os.environ.get("CODEX_HOME")
+    ):
+        selected_codex_home = Path(os.environ["CODEX_HOME"])
+    try:
+        install(
+            ROOT,
+            args.home.expanduser().absolute(),
+            args.target,
+            args.dry_run,
+            selected_codex_home,
+        )
+    except (OSError, ValueError) as error:
+        parser.exit(
+            1,
+            f"{error}\nRun python3 scripts/sync-skills.py to fetch missing pinned sources.\n",
+        )
