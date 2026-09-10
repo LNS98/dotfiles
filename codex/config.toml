@@ -1,0 +1,3 @@
+# Starter preferences. Copied on first install; existing config.toml is preserved.
+# Models, approval policy, credentials and project trust remain machine-local.
+project_doc_fallback_filenames = ["CLAUDE.md"]

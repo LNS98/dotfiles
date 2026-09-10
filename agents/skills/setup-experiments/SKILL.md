@@ -34,7 +34,7 @@ Summarise what's present and what's missing. Walk the decisions **one at a time*
 
 ## 3. Write
 
-Write `docs/agents/experiments.md` with the confirmed answers (create `docs/agents/` if absent). Add an `## Experiments` block to the repo's `CLAUDE.md` (or `AGENTS.md` if that's what exists) pointing at it:
+Write `docs/agents/experiments.md` with the confirmed answers, creating `docs/agents/` if absent. Add an `## Experiments` block to the repo's `AGENTS.md`, creating it if absent. Ensure `CLAUDE.md` imports it with `@AGENTS.md`, creating that file if absent and preserving existing Claude instructions. If `CLAUDE.md` already resolves to `AGENTS.md` through a symlink, leave the link intact and skip the import. Include these file changes in the confirmation in step 2. The block points at the experiment configuration:
 
 ```markdown
 ## Experiments
