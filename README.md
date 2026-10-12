@@ -61,8 +61,8 @@ Both tools read identical skill files and references. The legacy repo paths
 `claude/skills` and `claude/CLAUDE.md` remain compatibility symlinks. Edit personal
 files under `agents/`.
 
-The selected catalog contains five personal skills, the 25 promoted skills from
-Matt Pocock's v1.2.3 release, and pstack's `unslop` and `technical-writing`.
+The selected catalog contains five personal skills, the 27 promoted skills from
+Matt Pocock's main branch after v1.3.1, and pstack's `unslop` and `technical-writing`.
 The pstack overlay preserves `technical-writing`'s existing explicit-only policy
 in Codex. The setup skill patch writes shared project guidance to `AGENTS.md`
 and makes it reachable from `CLAUDE.md`, preserving the user's approval gate.
