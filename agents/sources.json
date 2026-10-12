@@ -2,7 +2,7 @@
   "cli_version": "1.5.25",
   "sources": [
     {
-      "source": "https://github.com/mattpocock/skills.git#8b36d4fb2635b3c21998dcd8144439c9e5ba7302",
+      "source": "https://github.com/mattpocock/skills.git#49dd158d1076134a641b33efb035946536778336",
       "skills": [
         "ask-matt",
         "diagnosing-bugs",
@@ -20,7 +20,6 @@
         "domain-modeling",
         "codebase-design",
         "code-review",
-        "resolving-merge-conflicts",
         "wizard",
         "grill-me",
         "grilling",
@@ -28,7 +27,10 @@
         "teach",
         "to-questionnaire",
         "wait-what",
-        "writing-for-agents"
+        "writing-for-agents",
+        "implement-spec",
+        "pr",
+        "retro"
       ]
     },
     {
