@@ -1,7 +1,7 @@
 # Dotfiles
 
 Personal editor, terminal and coding-agent setup. Claude Code and Codex share
-personal instructions and the same selection of 32 skills. Native settings stay
+personal instructions and the same selection of 35 skills. Native settings stay
 separate.
 
 ## Install agent configuration
@@ -61,7 +61,7 @@ Both tools read identical skill files and references. The legacy repo paths
 `claude/skills` and `claude/CLAUDE.md` remain compatibility symlinks. Edit personal
 files under `agents/`.
 
-The selected catalog contains five personal skills, the 27 promoted skills from
+The selected catalog contains six personal skills, the 27 promoted skills from
 Matt Pocock's main branch after v1.3.1, and pstack's `unslop` and `technical-writing`.
 The pstack overlay preserves `technical-writing`'s existing explicit-only policy
 in Codex. The setup skill patch writes shared project guidance to `AGENTS.md`
